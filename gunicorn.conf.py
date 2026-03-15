@@ -1,0 +1,9 @@
+bind = "127.0.0.1:6958"
+workers = 2
+worker_class = "uvicorn.workers.UvicornWorker"
+workerconnections = 1000
+timeout = 120
+keepalive = 5
+errorlog = "/var/log/api_offer/gunicorn_error.log"
+accesslog = "/var/log/api_offer/gunicorn_access.log"
+loglevel = "info"

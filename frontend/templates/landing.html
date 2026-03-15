@@ -1,0 +1,469 @@
+{% extends "base.html" %}
+{% set active_page = "home" %}
+{% block title %}Inicio{% endblock %}
+
+{% block content %}
+
+<!-- ══════════════════════════════════════════════════════════
+     HERO — two columns on desktop, stacked on mobile
+     ═══════════════════════════════════════════════════════════ -->
+<section class="landing-hero">
+
+  <!-- LEFT: copy + CTAs -->
+  <div class="landing-hero-left">
+
+    <div class="landing-badge">
+      <span class="landing-badge-dot"></span>
+      Bajadas de precio en tiempo real &middot; 8 supermercados
+    </div>
+
+    <h1 class="landing-h1">
+      Las mejores <span class="highlight">ofertas</span> de<br>
+      supermercados en<br>
+      un solo lugar
+    </h1>
+
+    <p class="landing-subtitle">
+      Mercadona, Carrefour, Alimerka, Masymas, Aldi, Alcampo, Familia y Gadis.
+      Precios actualizados diariamente desde fuentes oficiales.
+    </p>
+
+    <div class="landing-cta-row">
+      <a href="{{ root_path }}/ofertas" class="btn-landing-primary">
+        Ver ofertas
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M5 12h14M12 5l7 7-7 7"/>
+        </svg>
+      </a>
+      <a href="{{ root_path }}/comparar" class="btn-landing-ghost">
+        Comparar precios
+      </a>
+    </div>
+
+    <div class="landing-supermarkets">
+      <span class="landing-supermarkets-label">Disponible en:</span>
+      <span class="smarket-pill">🛒 Mercadona</span>
+      <span class="smarket-pill">🏬 Carrefour</span>
+      <span class="smarket-pill">🛍 Alimerka</span>
+      <span class="smarket-pill">📦 Masymas</span>
+      <span class="smarket-pill">🏷 Aldi</span>
+      <span class="smarket-pill">🏪 Alcampo</span>
+      <span class="smarket-pill">🏠 Familia</span>
+      <span class="smarket-pill">🛒 Gadis</span>
+    </div>
+
+  </div>
+
+  <!-- RIGHT: Organic blob cascade visual -->
+  <div class="landing-hero-right">
+
+    <!-- SVG organic blob (replaces CSS border-radius blob + glow) -->
+    <svg class="hero-blob-svg" viewBox="0 0 620 530"
+         xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <defs>
+        <!-- Gradiente principal: blanco brillante → steel blue → azul oscuro -->
+        <radialGradient id="blobGrad" cx="36%" cy="26%" r="70%"
+                        gradientUnits="userSpaceOnUse"
+                        fx="220" fy="140">
+          <stop offset="0%"   stop-color="#f0faff" stop-opacity="1"/>
+          <stop offset="14%"  stop-color="#b8dff5" stop-opacity="0.97"/>
+          <stop offset="38%"  stop-color="#4682B4" stop-opacity="0.95"/>
+          <stop offset="65%"  stop-color="#2d5f8e" stop-opacity="0.93"/>
+          <stop offset="100%" stop-color="#163858" stop-opacity="0.85"/>
+        </radialGradient>
+        <!-- Filtro glow exterior -->
+        <filter id="blobGlow" x="-15%" y="-15%" width="130%" height="130%">
+          <feGaussianBlur in="SourceGraphic" stdDeviation="12" result="blur"/>
+          <feColorMatrix in="blur" type="matrix"
+            values="0.27 0 0 0 0
+                    0    0.51 0 0 0
+                    0    0    0.7 0 0
+                    0    0    0   0.45 0"
+            result="coloredBlur"/>
+          <feMerge>
+            <feMergeNode in="coloredBlur"/>
+            <feMergeNode in="SourceGraphic"/>
+          </feMerge>
+        </filter>
+        <!-- Capa brillo interior extra -->
+        <radialGradient id="innerGlow" cx="36%" cy="26%" r="42%"
+                        gradientUnits="userSpaceOnUse">
+          <stop offset="0%"   stop-color="#ffffff" stop-opacity="0.70"/>
+          <stop offset="35%"  stop-color="#d0ecfb" stop-opacity="0.35"/>
+          <stop offset="75%"  stop-color="#4682B4" stop-opacity="0"/>
+        </radialGradient>
+        <!-- Gradiente monedas -->
+        <radialGradient id="coinGrad" cx="35%" cy="30%" r="65%">
+          <stop offset="0%"   stop-color="#ffe066"/>
+          <stop offset="100%" stop-color="#f59e0b"/>
+        </radialGradient>
+      </defs>
+
+      <!-- Forma orgánica bezier (reemplaza border-radius) -->
+      <path class="blob-path"
+        d="M 305,12
+           C 435,-18 598,55 608,192
+           C 618,328 558,455 418,492
+           C 278,529 92,518 38,388
+           C -16,258 36,96 158,48
+           C 218,18 268,18 305,12 Z"
+        fill="url(#blobGrad)"
+        filter="url(#blobGlow)"/>
+
+      <!-- Capa brillo interior superpuesta -->
+      <path
+        d="M 305,12
+           C 435,-18 598,55 608,192
+           C 618,328 558,455 418,492
+           C 278,529 92,518 38,388
+           C -16,258 36,96 158,48
+           C 218,18 268,18 305,12 Z"
+        fill="url(#innerGlow)"/>
+
+      <!-- Estrellas ✦ de 4 puntas dispersas -->
+      <path class="hero-sparkle sp1"
+        d="M 95,95 L 98,104 L 107,107 L 98,110 L 95,119 L 92,110 L 83,107 L 92,104 Z"
+        fill="#ffe066" opacity="0.9"/>
+      <path class="hero-sparkle sp2"
+        d="M 500,65 L 503,73 L 511,76 L 503,79 L 500,87 L 497,79 L 489,76 L 497,73 Z"
+        fill="#ffd700" opacity="0.85"/>
+      <path class="hero-sparkle sp3"
+        d="M 555,280 L 557,286 L 563,288 L 557,290 L 555,296 L 553,290 L 547,288 L 553,286 Z"
+        fill="#ffe066" opacity="0.80"/>
+      <path class="hero-sparkle sp4"
+        d="M 120,380 L 122,387 L 129,389 L 122,391 L 120,398 L 118,391 L 111,389 L 118,387 Z"
+        fill="#ffd700" opacity="0.75"/>
+      <!-- Monedas doradas -->
+      <circle class="hero-sparkle sp5" cx="440" cy="60" r="9"
+        fill="url(#coinGrad)" opacity="0.9"/>
+      <circle class="hero-sparkle sp6" cx="88" cy="260" r="7"
+        fill="url(#coinGrad)" opacity="0.8"/>
+    </svg>
+
+    <!-- Floating supermarket logo bubbles (rounded-square) -->
+    <div class="hero-sm-bubble hero-sm-bubble--1">
+      <img src="{{ root_path }}/static/img/logo-carrefour.png?v=4" alt="Carrefour" width="36" height="36">
+    </div>
+    <div class="hero-sm-bubble hero-sm-bubble--2">
+      <img src="{{ root_path }}/static/img/logo-mercadona.png?v=3" alt="Mercadona" width="36" height="36">
+    </div>
+    <div class="hero-sm-bubble hero-sm-bubble--3">
+      <img src="{{ root_path }}/static/img/logo-dia.png?v=3" alt="DIA" width="36" height="36">
+    </div>
+
+    <!-- 3D perspective cascade of 6 product cards -->
+    <div class="hero-cascade">
+      <div class="hero-cascade-inner">
+
+        <!-- Row 1: top, background (scaled down) -->
+
+        <!-- Card 1: Gazpacho — Carrefour -->
+        <div class="hcard hcard--r1c1">
+          <div class="hcard-top">
+            <div class="hcard-logo hcard-logo--carrefour">C</div>
+            <div class="hcard-badge">-25%</div>
+          </div>
+          <div class="hcard-emoji">&#x1F345;</div>
+          <div class="hcard-name">Gazpacho 1L</div>
+          <div class="hcard-prices">
+            <span class="hcard-original">&euro;1,85</span>
+            <span class="hcard-offer">&euro;1,39</span>
+          </div>
+        </div>
+
+        <!-- Card 2: Jamón — Alimerka -->
+        <div class="hcard hcard--r1c2">
+          <div class="hcard-top">
+            <div class="hcard-logo hcard-logo--alimerka">A</div>
+            <div class="hcard-badge">-31%</div>
+          </div>
+          <div class="hcard-emoji">&#x1F969;</div>
+          <div class="hcard-name">Jam&oacute;n Jam&oacute;n</div>
+          <div class="hcard-prices">
+            <span class="hcard-original">&euro;3,20</span>
+            <span class="hcard-offer">&euro;2,19</span>
+          </div>
+        </div>
+
+        <!-- Card 3: Atún — Mercadona -->
+        <div class="hcard hcard--r1c3">
+          <div class="hcard-top">
+            <div class="hcard-logo hcard-logo--mercadona">M</div>
+            <div class="hcard-badge">-28%</div>
+          </div>
+          <div class="hcard-emoji">&#x1F41F;</div>
+          <div class="hcard-name">At&uacute;n claro</div>
+          <div class="hcard-prices">
+            <span class="hcard-original">&euro;2,49</span>
+            <span class="hcard-offer">&euro;1,79</span>
+          </div>
+        </div>
+
+        <!-- Row 2: bottom, foreground (full size) -->
+
+        <!-- Card 4: Olivas rellenas — Carrefour -->
+        <div class="hcard hcard--r2c1">
+          <div class="hcard-top">
+            <div class="hcard-logo hcard-logo--carrefour">C</div>
+            <div class="hcard-badge">-31%</div>
+          </div>
+          <div class="hcard-emoji">&#x1FAD2;</div>
+          <div class="hcard-name">Olivas rellenas</div>
+          <div class="hcard-prices">
+            <span class="hcard-original">&euro;2,30</span>
+            <span class="hcard-offer">&euro;1,59</span>
+          </div>
+        </div>
+
+        <!-- Card 5: Cereales maíz — Masymas -->
+        <div class="hcard hcard--r2c2">
+          <div class="hcard-top">
+            <div class="hcard-logo hcard-logo--masymas">Mm</div>
+            <div class="hcard-badge">-23%</div>
+          </div>
+          <div class="hcard-emoji">&#x1F33D;</div>
+          <div class="hcard-name">Cereales ma&iacute;z</div>
+          <div class="hcard-prices">
+            <span class="hcard-original">&euro;3,10</span>
+            <span class="hcard-offer">&euro;2,39</span>
+          </div>
+        </div>
+
+        <!-- Card 6: Aceitunas negras — Alimerka -->
+        <div class="hcard hcard--r2c3">
+          <div class="hcard-top">
+            <div class="hcard-logo hcard-logo--alimerka">A</div>
+            <div class="hcard-badge">-25%</div>
+          </div>
+          <div class="hcard-emoji">&#x1FAD2;</div>
+          <div class="hcard-name">Aceitunas negras</div>
+          <div class="hcard-prices">
+            <span class="hcard-original">&euro;1,99</span>
+            <span class="hcard-offer">&euro;1,49</span>
+          </div>
+        </div>
+
+      </div><!-- /.hero-cascade-inner -->
+    </div><!-- /.hero-cascade -->
+
+
+  </div>
+
+</section>
+
+<!-- ══════════════════════════════════════════════════════════
+     STATS BAR
+     ═══════════════════════════════════════════════════════════ -->
+<div class="landing-stats-bar">
+  <div class="landing-stat">
+    <div class="landing-stat-number" id="stat-total">—</div>
+    <div class="landing-stat-label">Ofertas activas</div>
+  </div>
+  <div class="landing-stat">
+    <div class="landing-stat-number" id="stat-fuentes">5</div>
+    <div class="landing-stat-label">Supermercados</div>
+  </div>
+  <div class="landing-stat">
+    <div class="landing-stat-number">Hasta 60%</div>
+    <div class="landing-stat-label">de descuento</div>
+  </div>
+  <div class="landing-stat">
+    <div class="landing-stat-number">Diario</div>
+    <div class="landing-stat-label">Actualización</div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════
+     CÓMO FUNCIONA
+     ═══════════════════════════════════════════════════════════ -->
+<section class="landing-section">
+
+  <div class="landing-section-header">
+    <span class="section-eyebrow">Simple y rápido</span>
+    <h2 class="landing-section-title">¿Cómo funciona?</h2>
+    <p class="landing-section-subtitle">
+      Tres pasos para encontrar la mejor oferta del día sin esfuerzo.
+    </p>
+  </div>
+
+  <div class="how-steps">
+
+    <!-- Step 1 -->
+    <div class="how-step">
+      <span class="how-step-number">1</span>
+      <div class="how-step-icon">
+        <svg width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="12" cy="12" r="3"/>
+          <path d="M12 1v3M12 20v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M1 12h3M20 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/>
+        </svg>
+      </div>
+      <div class="how-step-body">
+        <div class="how-step-title">Explora</div>
+        <div class="how-step-desc">Navega por todas las ofertas activas filtradas por supermercado o categoría. Actualizado cada día.</div>
+      </div>
+    </div>
+
+    <!-- Step 2 -->
+    <div class="how-step">
+      <span class="how-step-number">2</span>
+      <div class="how-step-icon">
+        <svg width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="11" cy="11" r="8"/>
+          <path d="M21 21l-4.35-4.35"/>
+        </svg>
+      </div>
+      <div class="how-step-body">
+        <div class="how-step-title">Compara</div>
+        <div class="how-step-desc">Busca un producto y compara el precio entre todos los supermercados disponibles al instante.</div>
+      </div>
+    </div>
+
+    <!-- Step 3 -->
+    <div class="how-step">
+      <span class="how-step-number">3</span>
+      <div class="how-step-icon">
+        <svg width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z"/>
+          <path d="M12 6v6l4 2"/>
+        </svg>
+      </div>
+      <div class="how-step-body">
+        <div class="how-step-title">Ahorra</div>
+        <div class="how-step-desc">Elige la mejor oferta y ve directamente al producto en la web del supermercado con un clic.</div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════
+     CARACTERÍSTICAS (2×2 grid)
+     ═══════════════════════════════════════════════════════════ -->
+<section class="landing-section">
+
+  <div class="landing-section-header">
+    <span class="section-eyebrow">Por qué elegirnos</span>
+    <h2 class="landing-section-title">Todo lo que necesitas</h2>
+    <p class="landing-section-subtitle">
+      Funcionalidades pensadas para que ahorrar sea fácil.
+    </p>
+  </div>
+
+  <div class="landing-features-grid">
+
+    <div class="landing-feature-card">
+      <div class="landing-feature-icon landing-feature-icon--blue">
+        <svg width="26" height="26" fill="none" stroke="var(--primary)" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
+        </svg>
+      </div>
+      <div class="landing-feature-body">
+        <div class="landing-feature-title">Datos en tiempo real</div>
+        <div class="landing-feature-desc">Ofertas scrapeadas diariamente desde las webs oficiales de cada supermercado. Siempre frescos.</div>
+      </div>
+    </div>
+
+    <div class="landing-feature-card">
+      <div class="landing-feature-icon landing-feature-icon--red">
+        <svg width="26" height="26" fill="none" stroke="var(--accent)" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="11" cy="11" r="8"/>
+          <path d="M21 21l-4.35-4.35"/>
+        </svg>
+      </div>
+      <div class="landing-feature-body">
+        <div class="landing-feature-title">Búsqueda avanzada</div>
+        <div class="landing-feature-desc">Filtra por supermercado, nombre de producto o código de barras. Encuentra exactamente lo que buscas.</div>
+      </div>
+    </div>
+
+    <div class="landing-feature-card">
+      <div class="landing-feature-icon landing-feature-icon--green">
+        <svg width="26" height="26" fill="none" stroke="#16a34a" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M3 3h2l.4 2M7 13h10l4-8H5.4"/>
+          <circle cx="9" cy="19" r="2"/>
+          <circle cx="20" cy="19" r="2"/>
+        </svg>
+      </div>
+      <div class="landing-feature-body">
+        <div class="landing-feature-title">Comparador de precios</div>
+        <div class="landing-feature-desc">Encuentra la mejor oferta del mismo producto entre todos los supermercados con un solo clic.</div>
+      </div>
+    </div>
+
+    <div class="landing-feature-card">
+      <div class="landing-feature-icon landing-feature-icon--gold">
+        <svg width="26" height="26" fill="none" stroke="#b45309" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z"/>
+          <path d="M12 8v4l3 3"/>
+        </svg>
+      </div>
+      <div class="landing-feature-body">
+        <div class="landing-feature-title">Actualización diaria</div>
+        <div class="landing-feature-desc">Los precios se sincronizan cada día desde las webs oficiales. Solo verás ofertas que siguen activas hoy.</div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+
+<!-- ══════════════════════════════════════════════════════════
+     EVOLUCIÓN DE PRECIOS — mini chart section
+     ═══════════════════════════════════════════════════════════ -->
+<section class="landing-section landing-section--chart">
+
+  <div class="landing-section-header">
+    <span class="section-eyebrow">Tendencias</span>
+    <h2 class="landing-section-title">Evolución de ofertas activas</h2>
+    <p class="landing-section-subtitle">
+      Sigue la evolución del número de bajadas de precio por supermercado.
+      <a href="{{ root_path }}/evolucion" class="chart-more-link">Ver análisis completo →</a>
+    </p>
+  </div>
+
+  <div class="landing-chart-controls">
+    <div class="period-toggle" id="landing-period-toggle">
+      <button class="period-btn active" data-days="7">7 días</button>
+      <button class="period-btn" data-days="30">30 días</button>
+    </div>
+  </div>
+
+  <div class="sparse-banner" id="landing-sparse-banner" style="display:none">
+    📊 El gráfico se está construyendo — se completará tras los próximos scrapes.
+  </div>
+
+  <div class="landing-chart-card">
+    <div class="chart-wrap">
+      <canvas id="landing-chart-activas"></canvas>
+    </div>
+  </div>
+
+</section>
+
+
+<!-- ══════════════════════════════════════════════════════════
+     CTA FINAL
+     ═══════════════════════════════════════════════════════════ -->
+<section class="landing-cta-final">
+  <div class="landing-cta-inner">
+    <h2 class="landing-cta-title">¿Listo para encontrar<br>las mejores ofertas?</h2>
+    <p class="landing-cta-desc">
+      Todas las bajadas de precio de tus supermercados favoritos, en un solo lugar, actualizadas cada día.
+    </p>
+    <a href="{{ root_path }}/ofertas" class="btn-landing-white">
+      Ver todas las ofertas
+      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M5 12h14M12 5l7 7-7 7"/>
+      </svg>
+    </a>
+  </div>
+</section>
+
+{% endblock %}
+
+{% block scripts %}
+<script>window.__ROOT_PATH__ = "{{ root_path }}";</script>
+<script src="{{ root_path }}/static/js/landing.js?v=2"></script>
+<script src="{{ root_path }}/static/js/chart.umd.min.js"></script>
+<script src="{{ root_path }}/static/js/evolucion.js?v=10"></script>
+{% endblock %}

@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% set active_page = "evolucion" %}
+
+{% block title %}Evolución de Ofertas — PibiOffer{% endblock %}
+
+{% block content %}
+<div class="evolucion-page">
+  <div class="evolucion-header">
+    <h1 class="evolucion-title">Evolución de Ofertas</h1>
+    <p class="evolucion-subtitle">Tendencias de precio y descuento por supermercado</p>
+  </div>
+
+  <!-- Controls -->
+  <div class="evolucion-controls">
+    <div class="period-toggle" id="page-period-toggle">
+      <button class="period-btn active" data-days="7">7 días</button>
+      <button class="period-btn" data-days="30">30 días</button>
+    </div>
+    <div id="fuente-pills" class="fuente-pills">
+      <button class="fuente-pill active" id="pill-todos">Todos</button>
+    </div>
+  </div>
+
+  <!-- Sparse banner -->
+  <div class="sparse-banner" id="page-sparse-banner" style="display:none">
+    📊 El gráfico se está construyendo — se completará tras los próximos scrapes.
+  </div>
+
+  <!-- Chart 1 — full width -->
+  <div class="chart-card chart-card--full">
+    <h3 class="chart-title">Ofertas activas por supermercado</h3>
+    <div class="chart-wrap">
+      <canvas id="chart-activas"></canvas>
+    </div>
+  </div>
+
+  <!-- Charts row -->
+  <div class="charts-row">
+    <div class="chart-card">
+      <h3 class="chart-title">Descuento medio (%)</h3>
+      <div class="chart-wrap">
+        <canvas id="chart-descuento-avg"></canvas>
+      </div>
+    </div>
+    <div class="chart-card">
+      <h3 class="chart-title">Mayor descuento del día (%)</h3>
+      <div class="chart-wrap">
+        <canvas id="chart-descuento-max"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- Chart 3 — full width: price evolution -->
+  <div class="chart-card chart-card--full">
+    <h3 class="chart-title">Precio medio de ofertas (€)</h3>
+    <div class="chart-wrap">
+      <canvas id="chart-precio-avg"></canvas>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>window.__ROOT_PATH__ = "{{ root_path }}";</script>
+<script src="{{ root_path }}/static/js/chart.umd.min.js"></script>
+<script src="{{ root_path }}/static/js/evolucion.js?v=10"></script>
+{% endblock %}

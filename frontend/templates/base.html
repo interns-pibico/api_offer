@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#4682B4">
+  <title>{% block title %}Ofertas{% endblock %} — pibiCo Offers</title>
+  <link rel="stylesheet" href="{{ root_path }}/static/css/style.css?v=37">
+</head>
+<body>
+
+<script>
+  window.OFFER_ROOT = '{{ root_path }}';
+</script>
+
+<div class="app-layout">
+
+  <!-- HEADER -->
+  <header class="app-header">
+    <a href="{{ root_path }}/" class="header-brand">
+      <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="color:var(--primary)">
+        <path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z"/>
+        <line x1="7" y1="7" x2="7.01" y2="7"/>
+      </svg>
+      <span class="header-title">Ofertas pibiCo</span>
+    </a>
+    <nav class="header-nav">
+      <a href="{{ root_path }}/" class="nav-link {% if active_page == 'home' %}active{% endif %}">Inicio</a>
+      <a href="{{ root_path }}/ofertas" class="nav-link {% if active_page == 'ofertas' %}active{% endif %}">Ofertas</a>
+      <a href="{{ root_path }}/comparar" class="nav-link {% if active_page == 'comparar' %}active{% endif %}">Comparar</a>
+      <a href="{{ root_path }}/evolucion" class="nav-link {% if active_page == 'evolucion' %}active{% endif %}">Evolución</a>
+    </nav>
+  </header>
+
+  <!-- MAIN -->
+  <main class="app-main">
+    {% block content %}{% endblock %}
+  </main>
+
+  <!-- FOOTER -->
+  <footer class="app-footer">
+    <span>© 2026 pibiCo</span>
+    <span class="footer-sep">|</span>
+    <a href="{{ root_path }}/docs" target="_blank" rel="noopener">API Docs</a>
+    <span class="footer-sep">|</span>
+    <span>v1.0.0</span>
+  </footer>
+
+</div>
+
+{% block scripts %}{% endblock %}
+</body>
+</html>

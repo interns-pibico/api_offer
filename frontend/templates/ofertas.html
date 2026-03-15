@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% set active_page = "ofertas" %}
+{% block title %}Ofertas{% endblock %}
+
+{% block content %}
+
+<div class="page-header">
+  <h1 class="page-title">Ofertas y Promociones</h1>
+</div>
+
+<!-- FILTERS BAR -->
+<div class="filters-bar">
+  <div class="search-wrap">
+    <svg class="search-icon" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+      <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+    </svg>
+    <input type="search" id="search-input" class="form-control search-input" placeholder="Buscar producto...">
+  </div>
+  <select id="fuente-filter" class="form-control filter-select">
+    <option value="">Todos los supermercados</option>
+  </select>
+  <select id="sort-filter" class="form-control filter-select">
+    <option value="descuento_desc">Mayor descuento</option>
+    <option value="precio_asc">Precio: menor a mayor</option>
+    <option value="precio_desc">Precio: mayor a menor</option>
+    <option value="fecha_desc">Más recientes</option>
+  </select>
+</div>
+
+<!-- RESULTS COUNT -->
+<div class="results-info" id="results-info"></div>
+
+<!-- OFFERS GRID -->
+<div id="ofertas-grid" class="ofertas-grid">
+  <div class="loading-state">
+    <div class="spinner"></div>
+    <span>Cargando ofertas...</span>
+  </div>
+</div>
+
+<!-- PAGINATION -->
+<div id="pagination" class="pagination-bar"></div>
+
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ root_path }}/static/js/app.js?v=6"></script>
+{% endblock %}

@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% set active_page = "comparar" %}
+
+{% block title %}Comparar precios{% endblock %}
+
+{% block content %}
+
+<!-- HERO + SEARCH -->
+<section class="compare-hero">
+  <div class="compare-hero-content">
+    <h1 class="compare-hero-title">Comparar precios entre supermercados</h1>
+    <p class="compare-hero-subtitle">Busca un producto y encuentra la mejor oferta al instante</p>
+    <div class="compare-search-wrap">
+      <svg class="compare-search-icon" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+        <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
+      </svg>
+      <input
+        id="compare-search"
+        type="search"
+        class="compare-search-input"
+        placeholder="Ej: yogur griego, aceite oliva, leche…"
+        autocomplete="off"
+        autofocus
+      >
+    </div>
+  </div>
+</section>
+
+<!-- RESULTS SECTION (hidden initially) -->
+<section id="compare-results" style="display:none">
+  <p id="compare-summary" class="compare-summary"></p>
+
+  <!-- Winner card (full-width, green) -->
+  <div id="compare-winner" class="compare-winner" style="display:none"></div>
+
+  <!-- Rest of results -->
+  <p id="compare-rest-title" class="compare-rest-title" style="display:none">Otras opciones</p>
+  <div id="compare-rest-grid" class="ofertas-grid"></div>
+</section>
+
+<!-- SUGGESTIONS SECTION (visible initially) -->
+<section id="suggestions-wrap">
+  <p class="section-title" style="text-align:left; margin-bottom:.75rem; font-size:.9rem; text-transform:uppercase; letter-spacing:.05em; color:var(--text-muted)">
+    O elige un producto para comparar
+  </p>
+  <div id="suggestions-grid" class="suggestions-grid">
+    <div class="loading-state" style="grid-column:1/-1; padding:2rem">
+      <div class="spinner"></div>
+    </div>
+  </div>
+</section>
+
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ root_path }}/static/js/comparar.js?v=4"></script>
+{% endblock %}
