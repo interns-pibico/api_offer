@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="theme-color" content="#4682B4">
   <title>{% block title %}Ofertas{% endblock %} — pibiCo Offers</title>
-  <link rel="stylesheet" href="{{ root_path }}/static/css/style.css?v=37">
+  <link rel="stylesheet" href="{{ root_path }}/static/css/style.css?v=44">
 </head>
 <body>
 
@@ -29,6 +29,7 @@
       <a href="{{ root_path }}/ofertas" class="nav-link {% if active_page == 'ofertas' %}active{% endif %}">Ofertas</a>
       <a href="{{ root_path }}/comparar" class="nav-link {% if active_page == 'comparar' %}active{% endif %}">Comparar</a>
       <a href="{{ root_path }}/evolucion" class="nav-link {% if active_page == 'evolucion' %}active{% endif %}">Evolución</a>
+      <a href="{{ root_path }}/folletos" class="nav-link {% if active_page == 'folletos' %}active{% endif %}">Folletos</a>
     </nav>
   </header>
 
@@ -41,10 +42,13 @@
   <footer class="app-footer">
     <span>© 2026 pibiCo</span>
     <span class="footer-sep">|</span>
-    <a href="{{ root_path }}/docs" target="_blank" rel="noopener">API Docs</a>
+    <a href="{{ root_path }}/legal">Aviso Legal</a>
     <span class="footer-sep">|</span>
     <span>v1.0.0</span>
   </footer>
+  <div class="app-disclaimer">
+    Precios orientativos actualizados diariamente. Pueden variar sin previo aviso. Verifica en la web oficial del supermercado antes de comprar.
+  </div>
 
 </div>
 

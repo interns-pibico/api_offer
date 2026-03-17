@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% block title %}Aviso Legal{% endblock %}
+
+{% block content %}
+<div style="max-width:800px;margin:0 auto;padding:2rem 1rem">
+
+  <h1 style="font-size:1.75rem;font-weight:700;margin-bottom:2rem;color:var(--text)">Aviso Legal, Terminos de Servicio y Politica de Privacidad</h1>
+
+  <!-- Aviso Legal -->
+  <section id="aviso-legal" style="margin-bottom:2.5rem">
+    <h2 style="font-size:1.25rem;font-weight:600;color:var(--primary);margin-bottom:0.75rem">1. Aviso Legal</h2>
+    <p><strong>Titular:</strong> pibiCo</p>
+    <p><strong>Domicilio:</strong> Asturias, Espana</p>
+    <p><strong>Contacto:</strong> admin@pibico.es</p>
+    <p><strong>Sitio web:</strong> https://api.pibico.es/offer</p>
+    <p style="margin-top:0.75rem">
+      Este sitio web es un <strong>comparador de precios de supermercados</strong> con fines informativos.
+      Su objetivo es facilitar al consumidor la consulta y comparacion de precios publicos de productos
+      alimentarios ofertados por distintas cadenas de distribucion en Espana.
+    </p>
+    <p>
+      La actividad de comparacion de precios se ampara en la jurisprudencia espanola
+      (STS 572/2012) y en la Directiva 2019/790 del Parlamento Europeo sobre mercado unico digital,
+      que reconoce el derecho a la extraccion de datos publicos con fines de informacion al consumidor.
+    </p>
+  </section>
+
+  <!-- Terminos de Servicio -->
+  <section id="terminos" style="margin-bottom:2.5rem">
+    <h2 style="font-size:1.25rem;font-weight:600;color:var(--primary);margin-bottom:0.75rem">2. Terminos de Servicio</h2>
+    <ul style="padding-left:1.25rem;line-height:1.8">
+      <li>El servicio tiene caracter <strong>meramente informativo</strong>. Los precios mostrados son orientativos y pueden variar sin previo aviso.</li>
+      <li>pibiCo <strong>no garantiza</strong> la exactitud, completitud ni actualizacion en tiempo real de los datos mostrados.</li>
+      <li>Los precios se obtienen de fuentes publicas de las siguientes cadenas: Mercadona, Carrefour, Masymas, Alimerka, Aldi, Alcampo, Familia y Gadis.</li>
+      <li>pibiCo <strong>no tiene relacion comercial</strong> con ninguno de los supermercados listados. Las marcas y logos pertenecen a sus respectivos propietarios.</li>
+      <li>El servicio <strong>no monetiza directamente</strong> los datos de precios. No hay publicidad ni venta de datos a terceros.</li>
+      <li>Se recomienda siempre <strong>verificar el precio final</strong> en la web oficial o tienda fisica del supermercado antes de realizar la compra.</li>
+    </ul>
+  </section>
+
+  <!-- Politica de Privacidad -->
+  <section id="privacidad" style="margin-bottom:2.5rem">
+    <h2 style="font-size:1.25rem;font-weight:600;color:var(--primary);margin-bottom:0.75rem">3. Politica de Privacidad</h2>
+    <p>
+      Este sitio web es de <strong>acceso publico</strong> y no requiere registro ni autenticacion.
+    </p>
+    <ul style="padding-left:1.25rem;line-height:1.8">
+      <li><strong>No se recogen datos personales</strong> de los usuarios visitantes.</li>
+      <li>No se utilizan cookies de rastreo, analytics de terceros ni pixels de seguimiento.</li>
+      <li>Solo se emplean <strong>cookies tecnicas</strong> estrictamente necesarias para el funcionamiento del sitio.</li>
+      <li>No se comparten datos con terceros.</li>
+      <li>Los logs del servidor registran unicamente la direccion IP, metodo HTTP, ruta y codigo de respuesta con fines de seguridad y mantenimiento. Estos logs se eliminan periodicamente.</li>
+    </ul>
+  </section>
+
+  <!-- Bot de rastreo -->
+  <section id="bot" style="margin-bottom:2.5rem">
+    <h2 style="font-size:1.25rem;font-weight:600;color:var(--primary);margin-bottom:0.75rem">4. Bot de Rastreo</h2>
+    <p>
+      Para la recopilacion de precios publicos, pibiCo utiliza un bot automatizado identificado como:
+    </p>
+    <div style="background:var(--bg-card);border-radius:var(--radius);padding:1rem;margin:0.75rem 0;font-family:monospace;font-size:0.85rem;border:1px solid var(--border)">
+      pibiCoBot/1.0 (+https://api.pibico.es/offer; contact:admin@pibico.es)
+    </div>
+    <ul style="padding-left:1.25rem;line-height:1.8">
+      <li>El bot <strong>respeta robots.txt</strong> de cada sitio web antes de realizar cualquier solicitud.</li>
+      <li>Las solicitudes se realizan con intervalos razonables para no sobrecargar los servidores de origen.</li>
+      <li>Si desea bloquear el acceso del bot, anadalo a su archivo robots.txt o contacte con admin@pibico.es.</li>
+    </ul>
+  </section>
+
+  <p style="font-size:0.8rem;color:var(--text-muted);margin-top:2rem;text-align:center">
+    Ultima actualizacion: marzo 2026
+  </p>
+
+</div>
+{% endblock %}

@@ -17,6 +17,13 @@ class Settings(BaseSettings):
     # Offers older than this many hours are automatically marked inactive
     OFFER_STALE_HOURS: int = 48
 
+    # OpenAI (flyer extraction)
+    OPENAI_API_KEY: str = ""
+    OPENAI_MODEL: str = "gpt-5-mini"
+    OPENAI_MAX_TOKENS: int = 8192
+    FLYER_MAX_FILE_SIZE_MB: int = 50
+    FLYER_DPI: int = 200
+
     class Config:
         env_file = ".env"
         case_sensitive = True

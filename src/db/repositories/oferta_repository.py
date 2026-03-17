@@ -108,6 +108,15 @@ class OfertaRepository:
         )
         return result.scalar_one_or_none()
 
+    async def get_by_name_and_fuente(self, producto_nombre: str, fuente: str) -> Oferta | None:
+        result = await self.db.execute(
+            select(Oferta).where(
+                Oferta.producto_nombre == producto_nombre,
+                Oferta.fuente == fuente,
+            )
+        )
+        return result.scalar_one_or_none()
+
     async def create(self, data: OfertaCreate) -> Oferta:
         oferta = Oferta(**data.model_dump())
         self.db.add(oferta)

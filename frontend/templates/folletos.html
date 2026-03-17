@@ -1,0 +1,137 @@
+{% extends "base.html" %}
+{% set active_page = "folletos" %}
+{% block title %}Folletos{% endblock %}
+
+{% block content %}
+
+<div class="page-header">
+  <h1 class="page-title">Extractor de Folletos</h1>
+  <p class="page-subtitle">Sube un folleto PDF de supermercado y extrae productos y precios con IA.</p>
+</div>
+
+<!-- AUTH GATE -->
+<div id="auth-gate" class="flyer-auth-gate">
+  <div class="flyer-card">
+    <div class="flyer-card-icon">
+      <svg width="32" height="32" fill="none" stroke="var(--primary)" stroke-width="1.8" viewBox="0 0 24 24">
+        <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/>
+      </svg>
+    </div>
+    <h3 class="flyer-card-title">Acceso administrador</h3>
+    <p class="flyer-card-desc">Introduce la API Key de administrador para acceder al extractor.</p>
+    <div class="flyer-form-group">
+      <input type="password" id="api-key-input" class="form-control" placeholder="X-API-Key">
+      <button id="auth-btn" class="btn-primary" onclick="authenticate()">Acceder</button>
+    </div>
+    <div id="auth-error" class="flyer-error" style="display:none"></div>
+  </div>
+</div>
+
+<!-- MAIN TOOL (hidden until auth) -->
+<div id="flyer-tool" style="display:none">
+
+  <!-- UPLOAD FORM -->
+  <div class="flyer-card">
+    <h3 class="flyer-card-title">
+      <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+        <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><polyline points="9 15 12 12 15 15"/>
+      </svg>
+      Subir folleto PDF
+    </h3>
+
+    <div class="flyer-upload-area" id="drop-zone">
+      <svg width="40" height="40" fill="none" stroke="var(--text-muted)" stroke-width="1.5" viewBox="0 0 24 24">
+        <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+      </svg>
+      <p>Arrastra un PDF aquí o <label for="file-input" class="flyer-upload-link">selecciona archivo</label></p>
+      <input type="file" id="file-input" accept=".pdf" style="display:none">
+      <span class="flyer-upload-hint">PDF, máximo 50 MB</span>
+    </div>
+    <div id="file-info" class="flyer-file-info" style="display:none">
+      <span id="file-name"></span>
+      <button class="btn-ghost-sm" onclick="clearFile()">Quitar</button>
+    </div>
+
+    <!-- PAGE SELECTOR (shown after PDF upload) -->
+    <div id="page-selector" style="display:none">
+      <div id="pages-loading" class="flyer-pages-loading" style="display:none">
+        <span class="spinner-sm"></span> Generando vista previa de páginas...
+      </div>
+      <div class="flyer-pages-header">
+        <span class="form-label">Páginas a extraer <span class="text-muted" id="pages-count-label"></span></span>
+        <div class="flyer-pages-actions">
+          <button class="btn-ghost-sm" onclick="selectAllPages()">Seleccionar todas</button>
+          <button class="btn-ghost-sm" onclick="deselectAllPages()">Deseleccionar todas</button>
+        </div>
+      </div>
+      <div id="pages-grid" class="flyer-pages-grid"></div>
+      <input type="hidden" id="pages-input">
+    </div>
+
+    <div class="flyer-form-row">
+      <div class="flyer-form-group">
+        <label class="form-label">Supermercado</label>
+        <select id="supermarket-select" class="form-control filter-select">
+          <option value="carrefour">Carrefour</option>
+          <option value="aldi">Aldi</option>
+          <option value="alcampo">Alcampo</option>
+          <option value="alimerka">Alimerka</option>
+          <option value="masymas">Masymas</option>
+          <option value="familia">Familia</option>
+          <option value="gadis">Gadis</option>
+        </select>
+      </div>
+      <div class="flyer-form-group flyer-form-group--check">
+        <label class="form-label">
+          <input type="checkbox" id="save-check" checked> Guardar en base de datos
+        </label>
+      </div>
+    </div>
+
+    <div class="flyer-btn-row">
+      <button id="preview-btn" class="btn-secondary" onclick="runPreview()">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
+        </svg>
+        Preview (1 página)
+      </button>
+      <button id="extract-btn" class="btn-primary" onclick="runExtract()">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+        </svg>
+        Extraer seleccionadas
+      </button>
+    </div>
+  </div>
+
+  <!-- PROGRESS -->
+  <div id="progress-card" class="flyer-card" style="display:none">
+    <div id="progress-inner"></div>
+  </div>
+
+  <!-- RESULTS -->
+  <div id="results-card" class="flyer-card" style="display:none">
+    <h3 class="flyer-card-title">
+      <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+        <path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>
+      </svg>
+      Resultados
+    </h3>
+
+    <!-- Stats row -->
+    <div id="results-stats" class="flyer-stats-row"></div>
+
+    <!-- Products by page -->
+    <div id="results-pages"></div>
+
+    <!-- Errors -->
+    <div id="results-errors" style="display:none"></div>
+  </div>
+
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ root_path }}/static/js/folletos.js?v=11"></script>
+{% endblock %}

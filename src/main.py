@@ -37,6 +37,7 @@ app = FastAPI(
     title="API Offer",
     description="API de ofertas y promociones de supermercados",
     version="1.0.0",
+    root_path=settings.ROOT_PATH,
     docs_url="/docs",
     redoc_url="/redoc",
     openapi_url="/openapi.json",
@@ -98,4 +99,22 @@ async def evolucion_page(request: Request):
     return templates.TemplateResponse(
         "evolucion.html",
         {"request": request, "root_path": settings.ROOT_PATH},
+    )
+
+
+@app.get("/folletos", response_class=HTMLResponse, include_in_schema=False)
+async def folletos_page(request: Request):
+    """Flyer extraction tool (admin)."""
+    return templates.TemplateResponse(
+        "folletos.html",
+        {"request": request, "root_path": settings.ROOT_PATH},
+    )
+
+
+@app.get("/legal", response_class=HTMLResponse, include_in_schema=False)
+async def legal_page(request: Request):
+    """Legal notice, terms of service and privacy policy."""
+    return templates.TemplateResponse(
+        "legal.html",
+        {"request": request, "root_path": settings.ROOT_PATH, "active_page": "legal"},
     )

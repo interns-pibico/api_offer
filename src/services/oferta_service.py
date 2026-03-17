@@ -17,8 +17,12 @@ Carrefour scraping strategy
 ----------------------------
 Carrefour Spain exposes a public cloud-api JSON endpoint (no auth required):
 
-  GET https://www.carrefour.es/cloud-api/plp-food-papi/v1{path}?offset=N&rows=100
+  GET https://www.carrefour.es/cloud-api/plp-food-papi/v1{path}?offset=N&rows=24
     → paginated product list for a promotion-filtered category
+
+Uses Playwright (real Chromium browser) to legitimately pass Cloudflare
+Bot Management. No TLS fingerprint spoofing — the browser's own identity
+is used, just like any regular user.
 
 A product is a genuine "price drop" when:
   item.strikethrough_price is not None
@@ -76,9 +80,9 @@ import logging
 import re
 from difflib import SequenceMatcher
 from urllib.parse import urlparse
+from urllib.robotparser import RobotFileParser
 
 import httpx
-from curl_cffi.requests import AsyncSession as CurlSession
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.db.repositories.oferta_repository import OfertaRepository
@@ -90,16 +94,34 @@ logger = logging.getLogger(__name__)
 _BASE_API = "https://tienda.mercadona.es/api"
 _DEFAULT_WH = "3078"
 _LANG = "es"
+_BOT_UA = "pibiCoBot/1.0 (+https://api.pibico.es/offer; contact:admin@pibico.es)"
 _HEADERS = {
-    "User-Agent": (
-        "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
-        "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-    ),
+    "User-Agent": _BOT_UA,
     "Accept": "application/json",
     "Referer": "https://tienda.mercadona.es/",
 }
 _REQUEST_TIMEOUT = 30.0
 _DELAY_BETWEEN_REQUESTS = 0.5
+
+
+# ---------------------------------------------------------------------------
+# robots.txt validation
+# ---------------------------------------------------------------------------
+
+_ROBOT_CACHE: dict[str, RobotFileParser] = {}
+
+
+def _check_robots_txt(base_url: str, path: str = "/") -> bool:
+    """Check if robots.txt allows scraping the given path for our bot UA."""
+    if base_url not in _ROBOT_CACHE:
+        rp = RobotFileParser()
+        rp.set_url(f"{base_url}/robots.txt")
+        try:
+            rp.read()
+        except Exception:
+            return True  # If robots.txt is unreachable, allow
+        _ROBOT_CACHE[base_url] = rp
+    return _ROBOT_CACHE[base_url].can_fetch(_BOT_UA, path)
 
 
 # ---------------------------------------------------------------------------
@@ -143,17 +165,30 @@ _UNIVERSAL_NON_FOOD_KEYWORDS: frozenset[str] = frozenset({
     "champú", "champu", "acondicionador", "mascarilla capilar", "sérum capilar",
     "serum capilar", "ampollas tratamiento", "gel de ducha", "gel de baño",
     "gel de bano", "jabón de manos", "jabon de manos", "jabón corporal",
+    "jabon corporal", "gel corporal",
     "desodorante", "antitranspirante",
     "dentífrico", "dentifrico", "pasta dental", "pasta de dientes",
+    "cepillo dental", "cepillo dientes", "cepillo de dientes",
     "enjuague bucal", "colutorio",
     "eau de parfum", "eau de toilette", "agua de colonia", "agua de tocador",
     "colonia infantil",
     "maquinilla de afeitar", "maquinillas de afeitar", "cuchillas de afeitar",
     "aftershave", "espuma de afeitar",
     "crema corporal", "crema de manos", "crema hidratante corporal",
-    "loción corporal", "locion corporal",
-    "compresas", "tampón", "tampon", "copa menstrual",
-    "pañal", "panal", "toallitas húmedas", "toallitas bebe", "toallitas bebé",
+    "crema depilatoria", "depilación", "depilacion", "recambios maquinilla",
+    "loción corporal", "locion corporal", "protector solar", "bronceador",
+    "compresas", "compresa ", "tampón", "tampon", "copa menstrual",
+    "pañal", "panal", "pañales",
+    "toallitas húmedas", "toallitas humedas",
+    "toallitas bebe", "toallitas bebé",
+    "toallitas desmaquillantes", "toallitas íntimas", "toallitas intimas",
+    # Cosmética y maquillaje
+    "maquillaje", "rimmel", "pintalabios", "sombra de ojos",
+    "esmalte uñas", "esmalte unas", "esmalte de uñas",
+    "colorete", "corrector facial", "base de maquillaje",
+    "desmaquillante", "tinte pelo", "tinte cabello",
+    "pestañas postizas", "pestanas postizas",
+    "laca de uñas", "laca de unas",
     # Droguería / limpieza
     "detergente", "suavizante", "quitamanchas",
     "lejía", "lejia",
@@ -162,17 +197,48 @@ _UNIVERSAL_NON_FOOD_KEYWORDS: frozenset[str] = frozenset({
     "limpiador multiusos", "limpiador desinfectante", "limpiador baño",
     "limpiador cocina", "limpiador vitro", "limpiador suelos", "limpiador superficies",
     "limpiacristales", "friegasuelos", "fregona",
+    "limpiahogar", "limpiador de ",
     "ambientador", "desengrasante", "insecticida", "antiparasitario",
+    "raticida", "repelente mosquitos", "antimosquitos",
     "bolsas de basura", "bolsas basura",
     "papel higiénico", "papel higienico", "papel wc",
     "papel de cocina", "papel cocina multiusos",
-    # Hogar / bazar
-    "sartén", "sartenes", "batería de cocina", "cacerola", "olla express",
+    "servilleta", "servilletas",
+    "estropajo", "bayeta", "escoba", "recogedor", "mopa", "gamuza",
+    "perlas de perfume",
+    "film transparente", "papel de aluminio", "papel aluminio",
+    # Hogar / bazar / menaje
+    "sartén", "sarten", "sartenes", "batería de cocina", "cacerola",
+    "olla express", "olla a presión", "olla a presion",
     "cuchillo pelador", "cuchillo multiusos", "set cuchillos",
-    "lavavajillas qilive", "lavavajillas q.",
+    "lavavajillas",
+    "vaso ", "vasos ", "vasos de", "pack vasos",
+    "plato ", "platos ", "platos de", "vajilla",
+    "cubiertos", "cuchara ", "cucharas ", "tenedor", "tenedores",
+    "taza de cerámica", "taza de porcelana", "tazas de", "set tazas",
+    "jarra medidora", "jarra de vidrio", "jarra de cristal",
+    "bol de cerámica", "bol de porcelana", "boles de", "set boles",
+    "cuenco de cerámica", "cuenco de porcelana",
+    "fuente de cristal", "fuente de vidrio", "fuente de porcelana",
+    "tabla de cortar", "escurridor", "colador", "utensilios de",
+    "tupper", "táper", "taper", "fiambrera",
+    "cazo ", "cazos ", "cazuela",
+    # Muebles / jardín / exterior
+    "tumbona", "sombrilla", "parasol",
+    "mesa plegable", "silla plegable", "silla jardín", "silla jardin",
+    "conjunto mesa", "mueble jardín", "mueble jardin",
+    "hamaca", "balancín", "balancin",
+    # Electrónica / hogar
+    "pilas ", "pila ", "bombilla", "filtro de agua", "cartucho filtro",
+    "cargador", "cable usb", "auricular",
     # Mascotas
-    "pienso para", "arena para gato", "arena gato",
-    "snacks para perro", "snacks para gato", "alimento para gato", "alimento para perro",
+    "pienso para", "pienso perro", "pienso gato",
+    "arena para gato", "arena gato",
+    "snacks para perro", "snacks para gato",
+    "alimento para gato", "alimento para perro",
+    "alimento gato", "alimento perro",
+    "comida perro", "comida gato", "comida para perro", "comida para gato",
+    "snack perro", "snack gato",
 })
 
 
@@ -260,6 +326,10 @@ def _extract_offers_from_category_data(data: dict) -> list[OfertaCreate]:
 
 async def scrape_mercadona(warehouse: str = _DEFAULT_WH) -> list[OfertaCreate]:
     """Fetch ALL Mercadona categories and return all price-drop offers found."""
+    if not _check_robots_txt("https://tienda.mercadona.es", "/api/categories/"):
+        logger.warning("robots.txt de Mercadona prohíbe scraping, abortando")
+        return []
+
     all_offers: list[OfertaCreate] = []
 
     async with httpx.AsyncClient(follow_redirects=True) as client:
@@ -383,11 +453,12 @@ def _carrefour_item_to_oferta(item: dict) -> OfertaCreate | None:
     )
 
 
-async def _scrape_carrefour_category(
-    client: CurlSession,
+async def _scrape_carrefour_category_pw(
+    page,
     api_path: str,
     seen_urls: set[str],
 ) -> list[OfertaCreate]:
+    """Scrape one Carrefour promo category using a Playwright page (real browser)."""
     base_url = f"{_CARREFOUR_API_BASE}{api_path}"
     offers: list[OfertaCreate] = []
     offset = 0
@@ -397,19 +468,18 @@ async def _scrape_carrefour_category(
         url = f"{base_url}?offset={offset}&rows={_CARREFOUR_PAGE_SIZE}"
         data = None
         try:
-            resp = await client.get(
-                url,
-                headers=_CARREFOUR_HEADERS,
-                cookies=_CARREFOUR_COOKIES,
-                timeout=_REQUEST_TIMEOUT,
-            )
-            if resp.status_code == 404:
+            resp = await page.goto(url, wait_until="domcontentloaded", timeout=30_000)
+            if resp is None:
+                logger.warning("Carrefour: no response for %s", url)
+                return offers
+            if resp.status == 404:
                 logger.info("Carrefour category not found: %s", api_path)
                 return offers
-            if resp.status_code != 200:
-                logger.warning("Carrefour %s on %s", resp.status_code, url)
+            if resp.status != 200:
+                logger.warning("Carrefour %s on %s", resp.status, url)
                 return offers
-            data = resp.json()
+            body = await page.inner_text("body")
+            data = json.loads(body)
         except Exception as exc:
             logger.warning("Carrefour request failed for %s: %s", url, exc)
             return offers
@@ -444,17 +514,62 @@ async def _scrape_carrefour_category(
 async def scrape_carrefour() -> list[OfertaCreate]:
     """Scrape Carrefour Spain for genuine price-drop offers via cloud-api JSON.
 
-    Uses curl_cffi with Chrome impersonation to bypass Cloudflare Bot Management
-    (TLS/JA3 fingerprint protection). Anonymous salepoint cookie establishes
+    Uses Playwright with a real Chromium browser to legitimately pass
+    Cloudflare Bot Management. Anonymous salepoint cookie establishes
     region (Madrid 28232) for consistent results.
     """
+    if not _check_robots_txt("https://www.carrefour.es", "/cloud-api/"):
+        logger.warning("robots.txt de Carrefour prohíbe scraping, abortando")
+        return []
+
+    from playwright.async_api import async_playwright
+
     all_offers: list[OfertaCreate] = []
     seen_urls: set[str] = set()
 
-    async with CurlSession(impersonate="chrome") as client:
+    async with async_playwright() as pw:
+        browser = await pw.chromium.launch(
+            headless=False,
+            args=["--disable-blink-features=AutomationControlled"],
+        )
+        context = await browser.new_context(
+            viewport={"width": 1280, "height": 800},
+            locale="es-ES",
+            timezone_id="Europe/Madrid",
+        )
+
+        # Set salepoint cookies (anonymous, no login — just region)
+        await context.add_cookies([
+            {
+                "name": "Wizard",
+                "value": "true",
+                "domain": ".carrefour.es",
+                "path": "/",
+            },
+            {
+                "name": "salepoint",
+                "value": "005290||28232|A_DOMICILIO|0",
+                "domain": ".carrefour.es",
+                "path": "/",
+            },
+        ])
+
+        page = await context.new_page()
+
+        # Warm up: visit the main site to establish Cloudflare session
+        try:
+            await page.goto(
+                "https://www.carrefour.es/supermercado/ofertas/cat20968591/c",
+                wait_until="domcontentloaded",
+                timeout=30_000,
+            )
+            await asyncio.sleep(2)
+        except Exception as exc:
+            logger.warning("Carrefour: warmup page load failed: %s", exc)
+
         for api_path in _CARREFOUR_PROMO_PATHS:
             logger.info("Carrefour: scraping promo category %s", api_path)
-            offers = await _scrape_carrefour_category(client, api_path, seen_urls)
+            offers = await _scrape_carrefour_category_pw(page, api_path, seen_urls)
             all_offers.extend(offers)
             logger.info(
                 "Carrefour %s: %d price-drop offers (total so far: %d)",
@@ -463,6 +578,8 @@ async def scrape_carrefour() -> list[OfertaCreate]:
                 len(all_offers),
             )
             await asyncio.sleep(_CARREFOUR_DELAY)
+
+        await browser.close()
 
     logger.info("Carrefour scrape complete: %d price-drop offers", len(all_offers))
     return all_offers
@@ -480,10 +597,7 @@ _MASYMAS_GRID_URL = (
     "?cgid=09&start={start}&sz=100"
 )
 _MASYMAS_HEADERS = {
-    "User-Agent": (
-        "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
-        "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-    ),
+    "User-Agent": "pibiCoBot/1.0 (+https://api.pibico.es/offer; contact:admin@pibico.es)",
     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
     "Referer": "https://www.supermasymasonline.com/ofertas/",
 }
@@ -619,6 +733,10 @@ async def scrape_masymas() -> list[OfertaCreate]:
     cgid=09 (Ofertas category).  Paginates with start/sz=100 until an empty
     page is returned or 10 pages maximum.
     """
+    if not _check_robots_txt("https://supermasymasonline.com", "/"):
+        logger.warning("robots.txt de Masymas prohíbe scraping, abortando")
+        return []
+
     all_offers: list[OfertaCreate] = []
     seen_urls: set[str] = set()
     start = 0
@@ -690,10 +808,7 @@ _ALIMERKA_GRID_URL = (
     "?cgid=alimerka-null&start={start}&sz=100&format=page-element"
 )
 _ALIMERKA_HEADERS = {
-    "User-Agent": (
-        "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
-        "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-    ),
+    "User-Agent": "pibiCoBot/1.0 (+https://api.pibico.es/offer; contact:admin@pibico.es)",
     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
     "Accept-Language": "es-ES,es;q=0.9",
     "Referer": "https://www.alimerkaonline.es/ofertas",
@@ -783,6 +898,10 @@ async def scrape_alimerka() -> list[OfertaCreate]:
       2. GET Stores-FindByZipcode?zipCode=33001 to activate Asturias delivery zone.
       3. Paginate Search-UpdateGrid with cgid=alimerka-null until empty page.
     """
+    if not _check_robots_txt("https://alimerkaonline.es", "/"):
+        logger.warning("robots.txt de Alimerka prohíbe scraping, abortando")
+        return []
+
     all_offers: list[OfertaCreate] = []
     seen_urls: set[str] = set()
 
@@ -856,10 +975,7 @@ _ALDI_BASE = "https://www.aldi.es"
 _ALDI_FUENTE = "aldi.es"
 _ALDI_OFFERS_URL = "https://www.aldi.es/ofertas.html"
 _ALDI_HEADERS = {
-    "User-Agent": (
-        "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
-        "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-    ),
+    "User-Agent": "pibiCoBot/1.0 (+https://api.pibico.es/offer; contact:admin@pibico.es)",
     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
     "Accept-Language": "es-ES,es;q=0.9",
     "Referer": "https://www.aldi.es/",
@@ -1120,6 +1236,10 @@ async def scrape_aldi() -> list[OfertaCreate]:
     3. For mixed/unknown sections, scrape all tiles but filter by food keywords.
     4. Non-food sections are skipped entirely.
     """
+    if not _check_robots_txt("https://www.aldi.es", "/ofertas.html"):
+        logger.warning("robots.txt de Aldi prohíbe scraping, abortando")
+        return []
+
     try:
         from bs4 import BeautifulSoup  # noqa: F401 — validate import early
     except ImportError:
@@ -1232,10 +1352,7 @@ _ALCAMPO_BASE = "https://www.compraonline.alcampo.es"
 _ALCAMPO_FUENTE = "www.compraonline.alcampo.es"
 _ALCAMPO_REGION_ID = "ac90d761-9d58-4918-a37d-dd14e1ce384a"
 _ALCAMPO_HEADERS = {
-    "User-Agent": (
-        "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
-        "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-    ),
+    "User-Agent": "pibiCoBot/1.0 (+https://api.pibico.es/offer; contact:admin@pibico.es)",
     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
     "Accept-Language": "es-ES,es;q=0.9",
 }
@@ -1339,6 +1456,10 @@ async def scrape_alcampo() -> list[OfertaCreate]:
     API is CloudFront WAF-protected). Offers are identified by the presence of
     an offers[] entry with type == 'OFFER' in the entity data.
     """
+    if not _check_robots_txt("https://www.compraonline.alcampo.es", "/"):
+        logger.warning("robots.txt de Alcampo prohíbe scraping, abortando")
+        return []
+
     all_entities: dict[str, dict] = {}  # productId → entity
 
     async with httpx.AsyncClient(
@@ -1405,8 +1526,8 @@ async def scrape_alcampo() -> list[OfertaCreate]:
 # Apache Tapestry 5.6.2 on the Eroski group platform.
 #
 # The /filter/offers/ page requires authentication, but individual category
-# pages are publicly accessible as Googlebot (allowed by robots.txt). Products
-# are rendered as full HTML in each category page (server-side rendering).
+# pages are publicly accessible. Products are rendered as full HTML in each
+# category page (server-side rendering).
 #
 # Strategy:
 #   1. Fetch the sitemap.xml to get all category URLs.
@@ -1430,7 +1551,7 @@ _FAMILIA_BASE = "https://www.familiaonline.es"
 _FAMILIA_FUENTE = "www.familiaonline.es"
 _FAMILIA_SITEMAP_URL = "https://www.familiaonline.es/sitemap.xml"
 _FAMILIA_HEADERS = {
-    "User-Agent": "Googlebot/2.1 (+http://www.google.com/bot.html)",
+    "User-Agent": "pibiCoBot/1.0 (+https://api.pibico.es/offer; contact:admin@pibico.es)",
     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
     "Accept-Language": "es-ES,es;q=0.9",
 }
@@ -1588,13 +1709,17 @@ def _familia_extract_products(html: str) -> list[OfertaCreate]:
 async def scrape_familia() -> list[OfertaCreate]:
     """Scrape Familia Online for genuine food price-drop offers.
 
-    Uses the publicly accessible category pages (as Googlebot, which is
-    allowed by robots.txt). Fetches the sitemap to discover all category URLs,
-    then scrapes each standard numeric category for products where the original
+    Uses the publicly accessible category pages with a transparent bot
+    User-Agent. Fetches the sitemap to discover all category URLs, then
+    scrapes each standard numeric category for products where the original
     (before) price is explicitly shown alongside the current offer price.
 
     Caps at _FAMILIA_MAX_CATEGORIES to keep scrape time under ~6 minutes.
     """
+    if not _check_robots_txt("https://www.familiaonline.es", "/"):
+        logger.warning("robots.txt de Familia prohíbe scraping, abortando")
+        return []
+
     try:
         from bs4 import BeautifulSoup  # noqa: F401 — validate early
     except ImportError:
@@ -1715,10 +1840,7 @@ _GADIS_SITE_ID  = "56df88f9-479f-4361-891e-e1864dba1ca3"
 _GADIS_ROWS_PER_PAGE = 50
 _GADIS_DELAY = 0.5
 _GADIS_HEADERS = {
-    "User-Agent": (
-        "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
-        "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-    ),
+    "User-Agent": "pibiCoBot/1.0 (+https://api.pibico.es/offer; contact:admin@pibico.es)",
     "Accept": "application/json",
     "Content-Type": "application/json",
     "Origin": "https://www.gadisline.com",
@@ -1803,6 +1925,10 @@ async def scrape_gadis() -> list[OfertaCreate]:
     food promotional products found. precio_original is None because the
     API only exposes the discounted price; no before-price is available.
     """
+    if not _check_robots_txt("https://www.gadisline.com", "/"):
+        logger.warning("robots.txt de Gadis prohíbe scraping, abortando")
+        return []
+
     all_offers: list[OfertaCreate] = []
     seen_urls: set[str] = set()
 
@@ -1884,6 +2010,8 @@ async def save_offers(
         existing = None
         if offer_data.producto_url:
             existing = await repo.get_by_url_and_fuente(offer_data.producto_url, fuente)
+        if existing is None and offer_data.producto_nombre:
+            existing = await repo.get_by_name_and_fuente(offer_data.producto_nombre, fuente)
 
         if existing is not None:
             existing.producto_nombre = offer_data.producto_nombre

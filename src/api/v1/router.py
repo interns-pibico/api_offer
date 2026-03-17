@@ -2,10 +2,11 @@
 
 from fastapi import APIRouter
 
-from src.api.v1 import health, ofertas, evolucion
+from src.api.v1 import health, ofertas, evolucion, flyers
 
 api_router = APIRouter(prefix="/api/v1")
 
 api_router.include_router(health.router)
 api_router.include_router(ofertas.router)
 api_router.include_router(evolucion.router)
+api_router.include_router(flyers.router)
