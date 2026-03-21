@@ -111,6 +111,42 @@ async def folletos_page(request: Request):
     )
 
 
+@app.get("/listas", response_class=HTMLResponse, include_in_schema=False)
+async def listas_page(request: Request):
+    """Smart shopping list generator page."""
+    return templates.TemplateResponse(
+        "listas.html",
+        {"request": request, "root_path": settings.ROOT_PATH},
+    )
+
+
+@app.get("/login", response_class=HTMLResponse, include_in_schema=False)
+async def login_page(request: Request):
+    """Login / register page."""
+    return templates.TemplateResponse(
+        "login.html",
+        {"request": request, "root_path": settings.ROOT_PATH},
+    )
+
+
+@app.get("/registro", response_class=HTMLResponse, include_in_schema=False)
+async def register_page(request: Request):
+    """Redirect to login page (register tab)."""
+    return templates.TemplateResponse(
+        "login.html",
+        {"request": request, "root_path": settings.ROOT_PATH},
+    )
+
+
+@app.get("/cuenta", response_class=HTMLResponse, include_in_schema=False)
+async def cuenta_page(request: Request):
+    """Account settings page."""
+    return templates.TemplateResponse(
+        "cuenta.html",
+        {"request": request, "root_path": settings.ROOT_PATH},
+    )
+
+
 @app.get("/legal", response_class=HTMLResponse, include_in_schema=False)
 async def legal_page(request: Request):
     """Legal notice, terms of service and privacy policy."""

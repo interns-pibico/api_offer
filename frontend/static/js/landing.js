@@ -18,13 +18,21 @@
     })
     .catch(function () {});
 
-  /* ── Stat: número de fuentes (supermercados) ─────────────── */
+  /* ── Stat: número de supermercados (agrupados) ──────────── */
   fetch(ROOT + '/api/v1/offers/fuentes')
     .then(function (r) { return r.json(); })
     .then(function (data) {
       var el = document.getElementById('stat-fuentes');
-      if (el) {
-        var count = Array.isArray(data) ? data.length : (data.count || data.total || 0);
+      if (el && Array.isArray(data)) {
+        var keys = ['mercadona','carrefour','alimerka','masymas','aldi','alcampo','familia','gadis'];
+        var seen = {};
+        for (var i = 0; i < data.length; i++) {
+          var lower = data[i].toLowerCase();
+          for (var j = 0; j < keys.length; j++) {
+            if (lower.indexOf(keys[j]) !== -1) { seen[keys[j]] = true; break; }
+          }
+        }
+        var count = Object.keys(seen).length;
         if (count > 0) animateNumber(el, count);
       }
     })

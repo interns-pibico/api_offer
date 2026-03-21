@@ -23,6 +23,8 @@ class OfertaRepository:
         activo: bool | None = None,
         barcode: str | None = None,
         q: str | None = None,
+        categoria: str | None = None,
+        nutriscore: str | None = None,
         sort: str = "descuento_desc",
         offset: int = 0,
         limit: int = 20,
@@ -31,8 +33,16 @@ class OfertaRepository:
         count_query = select(func.count()).select_from(Oferta)
 
         if fuente is not None:
-            query = query.where(Oferta.fuente == fuente)
-            count_query = count_query.where(Oferta.fuente == fuente)
+            # If fuente is a supermarket key (no "." or ":"), match all
+            # related sources (web scraper + folleto).  e.g. "alimerka"
+            # matches "alimerkaonline.es" AND "folleto:alimerka".
+            if "." not in fuente and ":" not in fuente:
+                like = f"%{fuente}%"
+                query = query.where(Oferta.fuente.ilike(like))
+                count_query = count_query.where(Oferta.fuente.ilike(like))
+            else:
+                query = query.where(Oferta.fuente == fuente)
+                count_query = count_query.where(Oferta.fuente == fuente)
         if activo is not None:
             query = query.where(Oferta.activo == activo)
             count_query = count_query.where(Oferta.activo == activo)
@@ -43,6 +53,12 @@ class OfertaRepository:
             like = f"%{q}%"
             query = query.where(Oferta.producto_nombre.ilike(like))
             count_query = count_query.where(Oferta.producto_nombre.ilike(like))
+        if categoria is not None:
+            query = query.where(Oferta.categoria == categoria)
+            count_query = count_query.where(Oferta.categoria == categoria)
+        if nutriscore is not None:
+            query = query.where(Oferta.nutriscore == nutriscore)
+            count_query = count_query.where(Oferta.nutriscore == nutriscore)
 
         count_result = await self.db.execute(count_query)
         total = count_result.scalar_one()
@@ -113,7 +129,7 @@ class OfertaRepository:
             select(Oferta).where(
                 Oferta.producto_nombre == producto_nombre,
                 Oferta.fuente == fuente,
-            )
+            ).limit(1)
         )
         return result.scalar_one_or_none()
 
@@ -189,6 +205,156 @@ class OfertaRepository:
             count += result.rowcount
         await self.db.flush()
         return count
+
+    async def enrich_images_from_web(self, folleto_fuente: str, web_fuente: str) -> int:
+        """Copy imagen_url from web-scraper offers to matching folleto offers
+        that have no image.  Uses normalized name comparison (lowercase, no
+        punctuation) for robust matching across naming conventions."""
+        from sqlalchemy import text
+
+        # Helper SQL: normalize name → lowercase, strip punctuation/commas/dots,
+        # collapse whitespace.  e.g. "Fresón, caja de 1 kilo" → "fresón caja de 1 kilo"
+        _NORM = "trim(regexp_replace(lower(regexp_replace(trim({col}), '[^a-záéíóúüñ0-9 ]', ' ', 'gi')), '\\s+', ' ', 'g'))"
+        norm_f = _NORM.format(col="f.producto_nombre")
+        norm_w = _NORM.format(col="w.producto_nombre")
+
+        # Pass 1: exact normalized match
+        result = await self.db.execute(
+            text(f"""
+                UPDATE ofertas f
+                SET imagen_url = sub.imagen_url
+                FROM (
+                    SELECT DISTINCT ON (f2.id) f2.id AS fid, w2.imagen_url
+                    FROM ofertas f2
+                    JOIN ofertas w2
+                      ON w2.fuente = :web
+                     AND w2.activo = true
+                     AND w2.imagen_url IS NOT NULL
+                     AND {_NORM.format(col='f2.producto_nombre')}
+                       = {_NORM.format(col='w2.producto_nombre')}
+                    WHERE f2.fuente = :folleto
+                      AND f2.imagen_url IS NULL
+                      AND f2.activo = true
+                    ORDER BY f2.id, f2.id
+                ) sub
+                WHERE f.id = sub.fid
+            """),
+            {"folleto": folleto_fuente, "web": web_fuente},
+        )
+        exact = result.rowcount
+        await self.db.flush()
+
+        # Pass 2: containment match — web name contains folleto name or vice versa
+        result2 = await self.db.execute(
+            text(f"""
+                UPDATE ofertas f
+                SET imagen_url = sub.imagen_url
+                FROM (
+                    SELECT DISTINCT ON (f2.id) f2.id AS fid, w2.imagen_url
+                    FROM ofertas f2
+                    JOIN ofertas w2
+                      ON w2.fuente = :web
+                     AND w2.activo = true
+                     AND w2.imagen_url IS NOT NULL
+                     AND (
+                         {_NORM.format(col='w2.producto_nombre')}
+                           LIKE '%%' || {_NORM.format(col='f2.producto_nombre')} || '%%'
+                         OR {_NORM.format(col='f2.producto_nombre')}
+                           LIKE '%%' || {_NORM.format(col='w2.producto_nombre')} || '%%'
+                     )
+                    WHERE f2.fuente = :folleto
+                      AND f2.imagen_url IS NULL
+                      AND f2.activo = true
+                    ORDER BY f2.id, length(w2.producto_nombre)
+                ) sub
+                WHERE f.id = sub.fid
+            """),
+            {"folleto": folleto_fuente, "web": web_fuente},
+        )
+        fuzzy = result2.rowcount
+        await self.db.flush()
+        return exact + fuzzy
+
+    async def get_categorias(self) -> list[str]:
+        """Return distinct non-null categories from active offers."""
+        result = await self.db.execute(
+            select(Oferta.categoria)
+            .where(Oferta.activo == True, Oferta.categoria.isnot(None))  # noqa: E712
+            .distinct()
+            .order_by(Oferta.categoria)
+        )
+        return list(result.scalars().all())
+
+    async def get_nutriscore_stats(self) -> dict[str, int]:
+        """Return count of active offers per nutriscore grade."""
+        result = await self.db.execute(
+            select(Oferta.nutriscore, func.count())
+            .where(Oferta.activo == True, Oferta.nutriscore.isnot(None))  # noqa: E712
+            .group_by(Oferta.nutriscore)
+            .order_by(Oferta.nutriscore)
+        )
+        return {row[0]: row[1] for row in result.fetchall()}
+
+    async def get_active_with_barcode_no_nutriscore(self, limit: int = 500) -> list[Oferta]:
+        """Return active offers with barcode but no nutriscore (for enrichment)."""
+        result = await self.db.execute(
+            select(Oferta)
+            .where(
+                Oferta.activo == True,  # noqa: E712
+                Oferta.barcode.isnot(None),
+                Oferta.nutriscore.is_(None),
+            )
+            .limit(limit)
+        )
+        return list(result.scalars().all())
+
+    async def bulk_update_nutriscore(self, updates: list[tuple[str, str | None, int | None]]) -> int:
+        """Set nutriscore/novascore on offers matching barcode.
+        updates: list of (barcode, nutriscore, novascore)
+        Returns count updated."""
+        if not updates:
+            return 0
+        count = 0
+        for barcode, ns, nova in updates:
+            vals: dict = {}
+            if ns is not None:
+                vals["nutriscore"] = ns
+            if nova is not None:
+                vals["novascore"] = nova
+            if not vals:
+                continue
+            result = await self.db.execute(
+                update(Oferta)
+                .where(Oferta.barcode == barcode, Oferta.activo == True)  # noqa: E712
+                .values(**vals)
+            )
+            count += result.rowcount
+        await self.db.flush()
+        return count
+
+    async def bulk_update_categorias(self, updates: list[tuple[int, str]]) -> int:
+        """Set categoria on offers by id. Returns count updated."""
+        if not updates:
+            return 0
+        count = 0
+        for offer_id, cat in updates:
+            result = await self.db.execute(
+                update(Oferta)
+                .where(Oferta.id == offer_id)
+                .values(categoria=cat)
+            )
+            count += result.rowcount
+        await self.db.flush()
+        return count
+
+    async def get_active_without_categoria(self, limit: int = 5000) -> list[Oferta]:
+        """Return active offers without categoria."""
+        result = await self.db.execute(
+            select(Oferta)
+            .where(Oferta.activo == True, Oferta.categoria.is_(None))  # noqa: E712
+            .limit(limit)
+        )
+        return list(result.scalars().all())
 
     async def delete_by_fuente(self, fuente: str) -> int:
         from sqlalchemy import delete

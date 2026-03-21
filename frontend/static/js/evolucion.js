@@ -19,14 +19,25 @@
   }
 
   function formatLabel(fuente) {
-    if (fuente.includes('mercadona')) return 'Mercadona';
-    if (fuente.includes('carrefour')) return 'Carrefour';
-    if (fuente.includes('masymas') || fuente.includes('supermasymas')) return 'MasYMas';
-    if (fuente.includes('aldi')) return 'Aldi';
-    if (fuente.includes('alcampo')) return 'Alcampo';
-    if (fuente.includes('alimerka')) return 'Alimerka';
-    if (fuente.includes('familia')) return 'Familia';
-    if (fuente.includes('gadis')) return 'Gadis';
+    const lower = (fuente || '').toLowerCase();
+    // Handle folleto sources: "folleto:carrefour" → "Folleto Carrefour"
+    if (lower.startsWith('folleto:')) {
+      const superKey = lower.slice(8);
+      const nameMap = {
+        mercadona: 'Mercadona', carrefour: 'Carrefour', alimerka: 'Alimerka',
+        masymas: 'MasYMas', aldi: 'Aldi', alcampo: 'Alcampo',
+        familia: 'Familia', gadis: 'Gadis',
+      };
+      return 'Folleto ' + (nameMap[superKey] || superKey.replace(/\b\w/g, c => c.toUpperCase()));
+    }
+    if (lower.includes('mercadona')) return 'Mercadona';
+    if (lower.includes('carrefour')) return 'Carrefour';
+    if (lower.includes('masymas') || lower.includes('supermasymas')) return 'MasYMas';
+    if (lower.includes('aldi')) return 'Aldi';
+    if (lower.includes('alcampo')) return 'Alcampo';
+    if (lower.includes('alimerka')) return 'Alimerka';
+    if (lower.includes('familia')) return 'Familia';
+    if (lower.includes('gadis')) return 'Gadis';
     return fuente;
   }
 

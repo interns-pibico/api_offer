@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="theme-color" content="#4682B4">
   <title>{% block title %}Ofertas{% endblock %} — pibiCo Offers</title>
-  <link rel="stylesheet" href="{{ root_path }}/static/css/style.css?v=44">
+  <link rel="stylesheet" href="{{ root_path }}/static/css/style.css?v=48">
 </head>
 <body>
 
@@ -17,21 +17,67 @@
 
   <!-- HEADER -->
   <header class="app-header">
+    <!-- Hamburger (mobile only) -->
+    <button class="hamburger-btn" id="hamburger-btn" aria-label="Menú">
+      <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 12h18M3 6h18M3 18h18"/></svg>
+    </button>
     <a href="{{ root_path }}/" class="header-brand">
-      <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="color:var(--primary)">
+      <svg class="brand-icon" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="color:var(--primary)">
         <path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z"/>
         <line x1="7" y1="7" x2="7.01" y2="7"/>
       </svg>
       <span class="header-title">Ofertas pibiCo</span>
     </a>
-    <nav class="header-nav">
+    <!-- Desktop nav -->
+    <nav class="header-nav" id="header-nav">
       <a href="{{ root_path }}/" class="nav-link {% if active_page == 'home' %}active{% endif %}">Inicio</a>
       <a href="{{ root_path }}/ofertas" class="nav-link {% if active_page == 'ofertas' %}active{% endif %}">Ofertas</a>
       <a href="{{ root_path }}/comparar" class="nav-link {% if active_page == 'comparar' %}active{% endif %}">Comparar</a>
+      <a href="{{ root_path }}/listas" class="nav-link {% if active_page == 'listas' %}active{% endif %}">Listas</a>
       <a href="{{ root_path }}/evolucion" class="nav-link {% if active_page == 'evolucion' %}active{% endif %}">Evolución</a>
       <a href="{{ root_path }}/folletos" class="nav-link {% if active_page == 'folletos' %}active{% endif %}">Folletos</a>
     </nav>
+    <div class="user-menu" id="user-menu">
+      <!-- Not logged in -->
+      <div id="user-guest" class="user-guest">
+        <a href="{{ root_path }}/login" class="user-icon-btn" title="Iniciar sesión">
+          <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        </a>
+      </div>
+      <!-- Logged in (hidden by default) -->
+      <div id="user-logged" class="user-logged" style="display:none">
+        <button class="user-avatar-btn" id="user-avatar-btn" title="Mi cuenta">
+          <span id="user-initial">U</span>
+        </button>
+        <div class="user-dropdown" id="user-dropdown" style="display:none">
+          <div class="user-dropdown-name" id="user-dropdown-name"></div>
+          <a href="{{ root_path }}/listas" class="user-dropdown-item">Mis listas</a>
+          <a href="{{ root_path }}/cuenta" class="user-dropdown-item">Configuración</a>
+          <div class="user-dropdown-sep"></div>
+          <button class="user-dropdown-item user-dropdown-logout" id="btn-logout">Cerrar sesión</button>
+        </div>
+      </div>
+    </div>
   </header>
+
+  <!-- MOBILE DRAWER -->
+  <div class="mobile-drawer-overlay" id="mobile-drawer-overlay"></div>
+  <nav class="mobile-drawer" id="mobile-drawer">
+    <div class="mobile-drawer-header">
+      <span class="mobile-drawer-title">Menú</span>
+      <button class="mobile-drawer-close" id="mobile-drawer-close">
+        <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <a href="{{ root_path }}/" class="mobile-drawer-link {% if active_page == 'home' %}active{% endif %}">Inicio</a>
+    <a href="{{ root_path }}/ofertas" class="mobile-drawer-link {% if active_page == 'ofertas' %}active{% endif %}">Ofertas</a>
+    <a href="{{ root_path }}/comparar" class="mobile-drawer-link {% if active_page == 'comparar' %}active{% endif %}">Comparar</a>
+    <a href="{{ root_path }}/listas" class="mobile-drawer-link {% if active_page == 'listas' %}active{% endif %}">Listas</a>
+    <a href="{{ root_path }}/evolucion" class="mobile-drawer-link {% if active_page == 'evolucion' %}active{% endif %}">Evolución</a>
+    <a href="{{ root_path }}/folletos" class="mobile-drawer-link {% if active_page == 'folletos' %}active{% endif %}">Folletos</a>
+    <div class="mobile-drawer-sep"></div>
+    <a href="{{ root_path }}/login" class="mobile-drawer-link" id="mobile-drawer-login">Iniciar sesión</a>
+  </nav>
 
   <!-- MAIN -->
   <main class="app-main">
@@ -52,6 +98,30 @@
 
 </div>
 
+<script>
+// Mobile drawer toggle
+(function() {
+  var btn = document.getElementById('hamburger-btn');
+  var overlay = document.getElementById('mobile-drawer-overlay');
+  var drawer = document.getElementById('mobile-drawer');
+  var closeBtn = document.getElementById('mobile-drawer-close');
+
+  function open() {
+    drawer.classList.add('open');
+    overlay.classList.add('open');
+    document.body.style.overflow = 'hidden';
+  }
+  function close() {
+    drawer.classList.remove('open');
+    overlay.classList.remove('open');
+    document.body.style.overflow = '';
+  }
+  if (btn) btn.addEventListener('click', open);
+  if (closeBtn) closeBtn.addEventListener('click', close);
+  if (overlay) overlay.addEventListener('click', close);
+})();
+</script>
+<script src="{{ root_path }}/static/js/auth.js?v=2"></script>
 {% block scripts %}{% endblock %}
 </body>
 </html>

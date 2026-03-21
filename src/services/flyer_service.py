@@ -24,25 +24,15 @@ VALID_SUPERMARKETS = {
 _INPUT_COST_PER_M = 1.25
 _OUTPUT_COST_PER_M = 5.00
 
-_PROMPT_TEMPLATE = """Eres un extractor de datos de folletos de supermercado. Analiza esta imagen \
-de un folleto de {supermarket} y extrae ABSOLUTAMENTE TODOS los productos visibles, sin excepción.
+_PROMPT_TEMPLATE = """Extrae TODOS los productos de esta imagen de folleto de {supermarket}. \
+Examina toda la imagen: esquinas, laterales, recuadros pequeños. No omitas ninguno.
 
-Los folletos de supermercado contienen muchos productos por página (normalmente entre 4 y 20). \
-Examina toda la imagen con cuidado: arriba, abajo, esquinas, laterales, recuadros pequeños. \
-NO te saltes ningún producto aunque esté parcialmente visible o en letra pequeña.
+Por producto devuelve: producto_nombre (marca+descripcion+peso), precio_oferta (float/null), \
+precio_original (tachado, float/null), descuento_porcentaje (0-100, float/null; si no aparece \
+pero hay ambos precios calcula ((original-oferta)/original)*100).
 
-Para cada producto, devuelve:
-- producto_nombre: nombre completo tal como aparece (marca + descripción + peso/volumen/unidades). \
-  Ejemplo: "Aceite de oliva virgen extra CARBONELL 1L", "Yogur natural DANONE pack 4x125g"
-- precio_oferta: precio de venta/oferta en euros (float), o null si no aparece
-- precio_original: precio anterior/tachado en euros (float), o null si no aparece
-- descuento_porcentaje: porcentaje de descuento (float 0-100). Si no aparece explícito pero hay \
-  precio_original y precio_oferta, CALCULA el descuento: ((original - oferta) / original) * 100, \
-  redondeado a entero. Si no hay datos para calcularlo, null
-
-Responde SOLO con JSON válido: {{"productos": [...]}}
-Si no hay productos, responde: {{"productos": []}}
-Ignora banners publicitarios, logos y texto decorativo. Extrae solo productos con al menos un precio visible."""
+Solo JSON: {{"productos": [...]}}
+Ignora banners y logos. Solo productos con al menos un precio."""
 
 
 def _calc_cost(input_tokens: int, output_tokens: int) -> float:
@@ -55,7 +45,7 @@ def _calc_cost(input_tokens: int, output_tokens: int) -> float:
 
 
 def pdf_to_images_base64(pdf_bytes: bytes, dpi: int = 150, max_pages: int | None = None) -> list[str]:
-    """Convert PDF pages to base64-encoded PNG strings. Only converts up to max_pages."""
+    """Convert PDF pages to base64-encoded JPEG strings."""
     doc = fitz.open(stream=pdf_bytes, filetype="pdf")
     images = []
     limit = max_pages if max_pages else len(doc)
@@ -63,16 +53,16 @@ def pdf_to_images_base64(pdf_bytes: bytes, dpi: int = 150, max_pages: int | None
         if i >= limit:
             break
         pixmap = page.get_pixmap(dpi=dpi)
-        png_bytes = pixmap.tobytes("png")
-        images.append(base64.b64encode(png_bytes).decode("ascii"))
+        jpg_bytes = pixmap.tobytes("jpeg")
+        images.append(base64.b64encode(jpg_bytes).decode("ascii"))
     doc.close()
     return images
 
 
 def pdf_to_images_selected(pdf_bytes: bytes, page_indices: list[int], dpi: int = 150) -> list[tuple[int, str]]:
-    """Convert only selected PDF pages to (page_number, base64_png) tuples.
+    """Convert only selected PDF pages to (page_number, base64_jpeg) tuples.
 
-    page_indices are 0-based.
+    page_indices are 0-based. Uses JPEG for ~70% smaller transfer.
     """
     doc = fitz.open(stream=pdf_bytes, filetype="pdf")
     images = []
@@ -80,8 +70,8 @@ def pdf_to_images_selected(pdf_bytes: bytes, page_indices: list[int], dpi: int =
         if idx < len(doc):
             page = doc[idx]
             pixmap = page.get_pixmap(dpi=dpi)
-            png_bytes = pixmap.tobytes("png")
-            images.append((idx + 1, base64.b64encode(png_bytes).decode("ascii")))
+            jpg_bytes = pixmap.tobytes("jpeg")
+            images.append((idx + 1, base64.b64encode(jpg_bytes).decode("ascii")))
     doc.close()
     return images
 
@@ -103,6 +93,7 @@ def extract_offers_from_image(
     Returns (products, input_tokens, output_tokens).
     """
     prompt = _PROMPT_TEMPLATE.format(supermarket=supermarket)
+    detail = settings.FLYER_IMAGE_DETAIL
 
     response = client.responses.create(
         model=settings.OPENAI_MODEL,
@@ -112,7 +103,8 @@ def extract_offers_from_image(
                 {"type": "input_text", "text": prompt},
                 {
                     "type": "input_image",
-                    "image_url": f"data:image/png;base64,{image_b64}",
+                    "image_url": f"data:image/jpeg;base64,{image_b64}",
+                    "detail": detail,
                 },
             ],
         }],
@@ -164,6 +156,7 @@ def extract_single_page(
     client = _get_client()
     image_b64 = images[page - 1]
 
+    detail = settings.FLYER_IMAGE_DETAIL
     response = client.responses.create(
         model=settings.OPENAI_MODEL,
         input=[{
@@ -172,7 +165,8 @@ def extract_single_page(
                 {"type": "input_text", "text": _PROMPT_TEMPLATE.format(supermarket=supermarket)},
                 {
                     "type": "input_image",
-                    "image_url": f"data:image/png;base64,{image_b64}",
+                    "image_url": f"data:image/jpeg;base64,{image_b64}",
+                    "detail": detail,
                 },
             ],
         }],

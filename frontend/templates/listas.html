@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% set active_page = "listas" %}
+{% block title %}Lista de compra{% endblock %}
+
+{% block content %}
+
+<!-- Auth banner for guests -->
+<div id="listas-auth-banner" class="listas-auth-banner" style="display:none">
+  <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+  <span><a href="{{ root_path }}/login?next={{ root_path }}/listas">Inicia sesión</a> para guardar tus listas de la compra</span>
+</div>
+
+<!-- Saved lists section (logged in only) -->
+<div id="saved-lists-section" class="saved-lists-section" style="display:none">
+  <div class="saved-lists-header">
+    <h2>Mis listas guardadas</h2>
+    <span id="saved-lists-count" class="saved-lists-count"></span>
+  </div>
+  <div id="saved-lists-grid" class="saved-lists-grid"></div>
+  <div id="saved-lists-empty" class="saved-lists-empty" style="display:none">
+    <p>No tienes listas guardadas. Genera una lista y guárdala.</p>
+  </div>
+</div>
+
+<!-- Saved list detail modal -->
+<div id="list-detail-overlay" class="list-detail-overlay" style="display:none">
+  <div class="list-detail-card">
+    <div class="list-detail-header">
+      <h3 id="list-detail-name"></h3>
+      <button id="list-detail-close" class="list-detail-close">&times;</button>
+    </div>
+    <p id="list-detail-desc" class="list-detail-desc"></p>
+    <div id="list-detail-items" class="list-detail-items"></div>
+    <div class="list-detail-actions">
+      <button id="list-detail-delete" class="list-detail-delete-btn">Eliminar lista</button>
+    </div>
+  </div>
+</div>
+
+<div class="listas-hero">
+  <h1>Lista de compra inteligente</h1>
+  <p>Describe lo que quieres cocinar y te buscamos las mejores ofertas en 8 supermercados.</p>
+</div>
+
+<div class="listas-input-wrap">
+  <input type="text" id="listas-prompt" class="listas-input"
+    placeholder="Ej: Cena para 4, pasta con verduras, presupuesto 15€">
+  <button id="listas-btn" class="listas-btn">Generar lista</button>
+</div>
+
+<div id="listas-loading" style="display:none;text-align:center;padding:2rem">
+  <div class="spinner"></div>
+  <p style="margin-top:0.75rem;color:var(--text-muted)">Generando lista de ingredientes y buscando ofertas...</p>
+</div>
+
+<div id="listas-results" class="listas-results" style="display:none">
+  <div class="listas-results-topbar">
+    <h3 class="listas-ingredients-title" id="listas-title"></h3>
+    <button id="listas-save-btn" class="listas-save-btn" style="display:none">Guardar lista</button>
+  </div>
+  <div id="listas-items"></div>
+  <div id="listas-summary" class="listas-summary" style="display:none"></div>
+</div>
+
+<div id="listas-error" style="display:none" class="empty-state">
+  <div class="empty-state-title">Error al generar la lista</div>
+  <div class="empty-state-desc" id="listas-error-msg"></div>
+</div>
+
+<!-- Save dialog -->
+<div id="save-dialog-overlay" class="list-detail-overlay" style="display:none">
+  <div class="list-detail-card" style="max-width:400px">
+    <div class="list-detail-header">
+      <h3>Guardar lista</h3>
+      <button id="save-dialog-close" class="list-detail-close">&times;</button>
+    </div>
+    <div style="padding:1rem 1.25rem">
+      <div class="form-group">
+        <label for="save-list-name">Nombre</label>
+        <input type="text" id="save-list-name" class="form-input" placeholder="Ej: Cena viernes" maxlength="100" required>
+      </div>
+      <div class="form-group">
+        <label for="save-list-desc">Descripción (opcional)</label>
+        <input type="text" id="save-list-desc" class="form-input" placeholder="Notas breves" maxlength="200">
+      </div>
+      <div id="save-dialog-error" class="form-error" style="display:none"></div>
+      <button id="save-dialog-submit" class="login-submit" style="width:100%;margin-top:0.75rem">Guardar</button>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ root_path }}/static/js/listas.js?v=5"></script>
+{% endblock %}

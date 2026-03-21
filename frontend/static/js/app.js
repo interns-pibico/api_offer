@@ -1,5 +1,6 @@
-/* api_offer — app.js v1
+/* api_offer — app.js v9
    Ofertas dashboard: load, filter, search, sort, paginate
+   + category filter, NutriScore filter & badges
 */
 (function () {
   'use strict';
@@ -11,18 +12,27 @@
   const paginationEl  = document.getElementById('pagination');
   const searchInput   = document.getElementById('search-input');
   const fuenteFilter  = document.getElementById('fuente-filter');
+  const categoriaFilter = document.getElementById('categoria-filter');
   const sortFilter    = document.getElementById('sort-filter');
   const resultsInfo   = document.getElementById('results-info');
+  const nutriscorePills = document.getElementById('nutriscore-pills');
 
   if (!grid) return; // not on ofertas page
 
   // ── State ────────────────────────────────────────────────────
-  let currentPage    = 1;
-  let currentFuente  = '';
-  let currentQ       = '';
-  let currentSort    = 'descuento_desc';
-  let allItems       = [];
-  let searchTimeout  = null;
+  let currentPage       = 1;
+  let currentFuente     = '';
+  let currentCategoria  = '';
+  let currentNutriscore = '';
+  let currentQ          = '';
+  let currentSort       = 'descuento_desc';
+  let allItems          = [];
+  let searchTimeout     = null;
+
+  // ── NutriScore colors ────────────────────────────────────────
+  const NS_COLORS = {
+    a: '#038141', b: '#85BB2F', c: '#FECB02', d: '#EE8100', e: '#E63E11'
+  };
 
   // ── Helpers ──────────────────────────────────────────────────
   function fmtPrice(v) {
@@ -61,6 +71,11 @@
       elcorteingles:'El Corte Inglés',
     };
     const lower = (fuente || '').toLowerCase();
+    if (lower.startsWith('folleto:')) {
+      const superKey = lower.slice(8);
+      const superName = map[superKey] || superKey.replace(/\b\w/g, c => c.toUpperCase());
+      return 'Folleto ' + superName;
+    }
     for (const [key, name] of Object.entries(map)) {
       if (lower.includes(key)) return name;
     }
@@ -78,6 +93,11 @@
 
     const badgeHtml = discPct !== null
       ? `<div class="oferta-badge">-${discPct}%</div>` : '';
+
+    // NutriScore badge
+    const nsHtml = o.nutriscore
+      ? `<div class="nutriscore-badge nutriscore-${o.nutriscore}" title="NutriScore ${o.nutriscore.toUpperCase()}">${o.nutriscore.toUpperCase()}</div>`
+      : '';
 
     const imgSrc = escHtml(o.imagen_url || '');
     const imgHtml = o.imagen_url
@@ -105,6 +125,7 @@
 
     return `
       <div class="oferta-card">
+        ${nsHtml}
         ${badgeHtml}
         <div class="oferta-img-wrap">
           ${imgHtml}
@@ -127,26 +148,6 @@
       </div>`;
   }
 
-  // ── Sort items ────────────────────────────────────────────────
-  function sortItems(items) {
-    const sorted = [...items];
-    switch (currentSort) {
-      case 'precio_asc':
-        sorted.sort((a, b) => (a.precio_oferta || 0) - (b.precio_oferta || 0));
-        break;
-      case 'precio_desc':
-        sorted.sort((a, b) => (b.precio_oferta || 0) - (a.precio_oferta || 0));
-        break;
-      case 'fecha_desc':
-        sorted.sort((a, b) => new Date(b.scraped_at) - new Date(a.scraped_at));
-        break;
-      case 'descuento_desc':
-      default:
-        sorted.sort((a, b) => (b.descuento_porcentaje || 0) - (a.descuento_porcentaje || 0));
-    }
-    return sorted;
-  }
-
   // ── Render grid ───────────────────────────────────────────────
   function renderGrid(items) {
     if (!items || items.length === 0) {
@@ -165,17 +166,45 @@
     grid.innerHTML = items.map(renderCard).join('');
   }
 
-  // ── Load fuentes for dropdown ─────────────────────────────────
+  // ── Map raw fuente → supermarket key ─────────────────────────
+  function fuenteKey(fuente) {
+    const lower = (fuente || '').toLowerCase();
+    const keys = ['mercadona','carrefour','alimerka','masymas','aldi','alcampo','familia','gadis'];
+    for (const k of keys) {
+      if (lower.includes(k)) return k;
+    }
+    return fuente;
+  }
+
+  // ── Load fuentes for dropdown (grouped by supermarket) ──────
   async function loadFuentes() {
     try {
       const fuentes = await fetch(`${ROOT}/api/v1/offers/fuentes`).then(r => r.json());
-      if (Array.isArray(fuentes)) {
-        fuentes.forEach(f => {
-          const opt = document.createElement('option');
-          opt.value = f;
-          opt.textContent = fuenteLabel(f);
-          fuenteFilter.appendChild(opt);
-        });
+      if (!Array.isArray(fuentes)) return;
+      const seen = new Set();
+      for (const f of fuentes) {
+        const key = fuenteKey(f);
+        if (seen.has(key)) continue;
+        seen.add(key);
+        const opt = document.createElement('option');
+        opt.value = key;
+        opt.textContent = fuenteLabel(f.startsWith('folleto:') ? f.slice(8) : f);
+        fuenteFilter.appendChild(opt);
+      }
+    } catch (_) {}
+  }
+
+  // ── Load categories for dropdown ──────────────────────────────
+  async function loadCategorias() {
+    if (!categoriaFilter) return;
+    try {
+      const cats = await fetch(`${ROOT}/api/v1/offers/categorias`).then(r => r.json());
+      if (!Array.isArray(cats)) return;
+      for (const c of cats) {
+        const opt = document.createElement('option');
+        opt.value = c;
+        opt.textContent = c;
+        categoriaFilter.appendChild(opt);
       }
     } catch (_) {}
   }
@@ -227,8 +256,10 @@
         activo: 'true',
         sort: currentSort,
       });
-      if (currentFuente) params.set('fuente', currentFuente);
-      if (currentQ)      params.set('q', currentQ);
+      if (currentFuente)     params.set('fuente', currentFuente);
+      if (currentQ)          params.set('q', currentQ);
+      if (currentCategoria)  params.set('categoria', currentCategoria);
+      if (currentNutriscore) params.set('nutriscore', currentNutriscore);
 
       const data = await fetch(`${ROOT}/api/v1/offers?${params}`).then(r => r.json());
 
@@ -262,7 +293,7 @@
   sortFilter.addEventListener('change', () => {
     currentSort = sortFilter.value;
     currentPage = 1;
-    loadOfertas(1); // server-side sort
+    loadOfertas(1);
   });
 
   fuenteFilter.addEventListener('change', () => {
@@ -271,8 +302,40 @@
     loadOfertas(1);
   });
 
+  if (categoriaFilter) {
+    categoriaFilter.addEventListener('change', () => {
+      currentCategoria = categoriaFilter.value;
+      currentPage = 1;
+      loadOfertas(1);
+    });
+  }
+
+  // NutriScore pills
+  if (nutriscorePills) {
+    nutriscorePills.addEventListener('click', (e) => {
+      const btn = e.target.closest('.nutriscore-pill');
+      if (!btn) return;
+      nutriscorePills.querySelectorAll('.nutriscore-pill').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      currentNutriscore = btn.dataset.ns || '';
+      currentPage = 1;
+      loadOfertas(1);
+    });
+  }
+
   // ── Init ──────────────────────────────────────────────────────
+  // Check URL params for initial filter state
+  const urlParams = new URLSearchParams(window.location.search);
+  if (urlParams.get('categoria')) {
+    currentCategoria = urlParams.get('categoria');
+    // Will be selected after loadCategorias populates options
+    setTimeout(() => {
+      if (categoriaFilter) categoriaFilter.value = currentCategoria;
+    }, 500);
+  }
+
   loadFuentes();
+  loadCategorias();
   loadOfertas(1);
 
 })();

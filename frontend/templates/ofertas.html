@@ -19,12 +19,31 @@
   <select id="fuente-filter" class="form-control filter-select">
     <option value="">Todos los supermercados</option>
   </select>
+  <select id="categoria-filter" class="form-control filter-select">
+    <option value="">Todas las categorías</option>
+  </select>
   <select id="sort-filter" class="form-control filter-select">
     <option value="descuento_desc">Mayor descuento</option>
     <option value="precio_asc">Precio: menor a mayor</option>
     <option value="precio_desc">Precio: mayor a menor</option>
     <option value="fecha_desc">Más recientes</option>
   </select>
+</div>
+
+<!-- NUTRISCORE FILTER -->
+<div class="nutriscore-filter-wrap">
+  <div class="nutriscore-filter-label">
+    <strong>NutriScore</strong>
+    <span class="nutriscore-help" title="El NutriScore clasifica los alimentos de A (más saludable) a E (menos saludable) según su perfil nutricional. Datos de Open Food Facts.">?</span>
+  </div>
+  <div class="nutriscore-pills" id="nutriscore-pills">
+    <button class="nutriscore-pill active" data-ns="">Todos</button>
+    <button class="nutriscore-pill nutriscore-pill-a" data-ns="a">A <span class="ns-desc">Excelente</span></button>
+    <button class="nutriscore-pill nutriscore-pill-b" data-ns="b">B <span class="ns-desc">Bueno</span></button>
+    <button class="nutriscore-pill nutriscore-pill-c" data-ns="c">C <span class="ns-desc">Medio</span></button>
+    <button class="nutriscore-pill nutriscore-pill-d" data-ns="d">D <span class="ns-desc">Bajo</span></button>
+    <button class="nutriscore-pill nutriscore-pill-e" data-ns="e">E <span class="ns-desc">Malo</span></button>
+  </div>
 </div>
 
 <!-- RESULTS COUNT -->
@@ -44,5 +63,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="{{ root_path }}/static/js/app.js?v=6"></script>
+<script src="{{ root_path }}/static/js/app.js?v=9"></script>
 {% endblock %}

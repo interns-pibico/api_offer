@@ -1,4 +1,4 @@
-/* api_offer — comparar.js v3
+/* api_offer — comparar.js v6
    Price comparator: winner card (green) + otras opciones grid
    Relevance filter: query must appear in first 3 words of product name
 */
@@ -58,6 +58,12 @@
       elcorteingles:      'El Corte Inglés',
     };
     const lower = (fuente || '').toLowerCase();
+    // Handle folleto sources: "folleto:carrefour" → "Folleto Carrefour"
+    if (lower.startsWith('folleto:')) {
+      const superKey = lower.slice(8);
+      const superName = map[superKey] || superKey.replace(/\b\w/g, c => c.toUpperCase());
+      return 'Folleto ' + superName;
+    }
     for (const [key, name] of Object.entries(map)) {
       if (lower.includes(key)) return name;
     }
@@ -121,6 +127,9 @@
     const discPct = o.descuento_porcentaje != null ? Math.round(o.descuento_porcentaje) : null;
     const badgeHtml = discPct !== null
       ? `<div class="oferta-badge">-${discPct}%</div>` : '';
+    const nsHtml = o.nutriscore
+      ? `<div class="nutriscore-badge nutriscore-${o.nutriscore}" title="NutriScore ${o.nutriscore.toUpperCase()}">${o.nutriscore.toUpperCase()}</div>`
+      : '';
     const imgHtml = o.imagen_url
       ? `<img class="oferta-img" src="${escHtml(o.imagen_url)}" alt="${escHtml(o.producto_nombre)}" loading="lazy" onerror="this.style.display='none'">`
       : `<div class="oferta-img-placeholder"><svg width="48" height="48" fill="none" stroke="#d1d5db" stroke-width="1.5" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg></div>`;
@@ -131,6 +140,7 @@
 
     return `
       <div class="oferta-card">
+        ${nsHtml}
         ${badgeHtml}
         <div class="oferta-img-wrap">${imgHtml}</div>
         <div class="oferta-body">

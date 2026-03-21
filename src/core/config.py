@@ -20,9 +20,19 @@ class Settings(BaseSettings):
     # OpenAI (flyer extraction)
     OPENAI_API_KEY: str = ""
     OPENAI_MODEL: str = "gpt-5-mini"
-    OPENAI_MAX_TOKENS: int = 8192
+    OPENAI_MAX_TOKENS: int = 4096
     FLYER_MAX_FILE_SIZE_MB: int = 50
-    FLYER_DPI: int = 200
+    FLYER_DPI: int = 150
+    FLYER_IMAGE_DETAIL: str = "auto"  # "low" = 85 tokens/img, "high" = ~600, "auto" = OpenAI decides
+
+    # Groq (shopping list generation — free tier, separate from OpenAI)
+    GROQ_API_KEY: str = ""
+    GROQ_MODEL: str = "llama-3.1-8b-instant"
+
+    # JWT (optional user auth)
+    JWT_SECRET_KEY: str = "change-me"
+    JWT_ALGORITHM: str = "HS256"
+    JWT_EXPIRE_MINUTES: int = 1440  # 24 hours
 
     class Config:
         env_file = ".env"

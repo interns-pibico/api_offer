@@ -27,4 +27,7 @@ class Oferta(Base):
     scraped_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_utcnow, nullable=False
     )
+    categoria: Mapped[str | None] = mapped_column(String(50), nullable=True, index=True)
+    nutriscore: Mapped[str | None] = mapped_column(String(1), nullable=True, index=True)
+    novascore: Mapped[int | None] = mapped_column(Integer, nullable=True)
     activo: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)

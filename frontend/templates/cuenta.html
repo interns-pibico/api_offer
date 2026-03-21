@@ -1,0 +1,336 @@
+{% extends "base.html" %}
+{% set active_page = "cuenta" %}
+{% block title %}Mi cuenta{% endblock %}
+
+{% block content %}
+
+<div class="cuenta-page">
+  <h1 class="cuenta-title">Configuración de cuenta</h1>
+
+  <!-- User info -->
+  <div class="cuenta-card">
+    <div class="cuenta-card-header">
+      <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+      <h2>Información</h2>
+    </div>
+    <div class="cuenta-info">
+      <div class="cuenta-field">
+        <span class="cuenta-label">Usuario</span>
+        <span class="cuenta-value" id="info-username">—</span>
+      </div>
+      <div class="cuenta-field">
+        <span class="cuenta-label">Email</span>
+        <span class="cuenta-value" id="info-email">—</span>
+      </div>
+      <div class="cuenta-field">
+        <span class="cuenta-label">Miembro desde</span>
+        <span class="cuenta-value" id="info-created">—</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Change username -->
+  <div class="cuenta-card">
+    <div class="cuenta-card-header">
+      <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+      <h2>Cambiar nombre de usuario</h2>
+    </div>
+    <div class="cuenta-form">
+      <div class="cuenta-form-group">
+        <label for="new-username">Nuevo nombre de usuario</label>
+        <input type="text" id="new-username" class="form-input" placeholder="Mínimo 3 caracteres" minlength="3" maxlength="100">
+      </div>
+      <div id="username-msg" class="cuenta-msg"></div>
+      <button class="cuenta-btn" id="btn-change-username">Cambiar usuario</button>
+    </div>
+  </div>
+
+  <!-- Change password -->
+  <div class="cuenta-card">
+    <div class="cuenta-card-header">
+      <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+      <h2>Cambiar contraseña</h2>
+    </div>
+    <div class="cuenta-form">
+      <div class="cuenta-form-group">
+        <label for="current-password">Contraseña actual</label>
+        <input type="password" id="current-password" class="form-input">
+      </div>
+      <div class="cuenta-form-group">
+        <label for="new-password">Nueva contraseña</label>
+        <input type="password" id="new-password" class="form-input" placeholder="Mínimo 6 caracteres" minlength="6">
+      </div>
+      <div id="password-msg" class="cuenta-msg"></div>
+      <button class="cuenta-btn" id="btn-change-password">Cambiar contraseña</button>
+    </div>
+  </div>
+
+  <!-- Delete account -->
+  <div class="cuenta-card cuenta-card-danger">
+    <div class="cuenta-card-header">
+      <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg>
+      <h2>Eliminar cuenta</h2>
+    </div>
+    <p class="cuenta-danger-text">Esta acción es irreversible. Se eliminarán tu cuenta y todas tus listas guardadas.</p>
+    <div class="cuenta-form">
+      <div class="cuenta-form-group">
+        <label for="delete-password">Confirma tu contraseña</label>
+        <input type="password" id="delete-password" class="form-input">
+      </div>
+      <div id="delete-msg" class="cuenta-msg"></div>
+      <button class="cuenta-btn cuenta-btn-danger" id="btn-delete-account">Eliminar mi cuenta</button>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function() {
+  var ROOT = window.OFFER_ROOT || '';
+
+  function authHeaders() {
+    var token = window.offerAuth && window.offerAuth.token;
+    if (!token) return {};
+    return { 'Authorization': 'Bearer ' + token };
+  }
+
+  function showMsg(el, text, isError) {
+    el.textContent = text;
+    el.className = 'cuenta-msg ' + (isError ? 'cuenta-msg-error' : 'cuenta-msg-ok');
+    el.style.display = '';
+  }
+
+  // Redirect if not logged in
+  function init() {
+    if (!window.offerAuth || !window.offerAuth.isLoggedIn) {
+      window.location.href = ROOT + '/login?next=' + encodeURIComponent(ROOT + '/cuenta');
+      return;
+    }
+    loadInfo();
+  }
+
+  async function loadInfo() {
+    try {
+      var hdrs = authHeaders();
+      var resp = await fetch(ROOT + '/api/v1/auth/me', { headers: hdrs });
+      if (!resp.ok) {
+        window.location.href = ROOT + '/login';
+        return;
+      }
+      var user = await resp.json();
+      document.getElementById('info-username').textContent = user.username;
+      document.getElementById('info-email').textContent = user.email;
+      document.getElementById('info-created').textContent = new Date(user.created_at).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' });
+      document.getElementById('new-username').value = user.username;
+    } catch(e) {
+      window.location.href = ROOT + '/login';
+    }
+  }
+
+  // Change username
+  document.getElementById('btn-change-username').addEventListener('click', async function() {
+    var msg = document.getElementById('username-msg');
+    msg.style.display = 'none';
+    var newName = document.getElementById('new-username').value.trim();
+    if (newName.length < 3) { showMsg(msg, 'Mínimo 3 caracteres', true); return; }
+
+    try {
+      var hdrs = authHeaders();
+      hdrs['Content-Type'] = 'application/json';
+      var resp = await fetch(ROOT + '/api/v1/auth/me/username', {
+        method: 'PUT', headers: hdrs,
+        body: JSON.stringify({ username: newName }),
+      });
+      var data = await resp.json();
+      if (!resp.ok) { showMsg(msg, data.detail || 'Error', true); return; }
+      showMsg(msg, 'Usuario actualizado', false);
+      document.getElementById('info-username').textContent = data.username;
+      // Update header
+      if (window.offerAuth) window.offerAuth.user = data;
+      var initEl = document.getElementById('user-initial');
+      if (initEl) initEl.textContent = data.username[0].toUpperCase();
+      var nameEl = document.getElementById('user-dropdown-name');
+      if (nameEl) nameEl.textContent = data.username;
+    } catch(e) { showMsg(msg, 'Error de conexión', true); }
+  });
+
+  // Change password
+  document.getElementById('btn-change-password').addEventListener('click', async function() {
+    var msg = document.getElementById('password-msg');
+    msg.style.display = 'none';
+    var current = document.getElementById('current-password').value;
+    var newPw = document.getElementById('new-password').value;
+    if (!current) { showMsg(msg, 'Introduce tu contraseña actual', true); return; }
+    if (newPw.length < 6) { showMsg(msg, 'La nueva contraseña debe tener al menos 6 caracteres', true); return; }
+
+    try {
+      var hdrs = authHeaders();
+      hdrs['Content-Type'] = 'application/json';
+      var resp = await fetch(ROOT + '/api/v1/auth/me/password', {
+        method: 'PUT', headers: hdrs,
+        body: JSON.stringify({ current_password: current, new_password: newPw }),
+      });
+      var data = await resp.json();
+      if (!resp.ok) { showMsg(msg, data.detail || 'Error', true); return; }
+      showMsg(msg, 'Contraseña actualizada', false);
+      document.getElementById('current-password').value = '';
+      document.getElementById('new-password').value = '';
+    } catch(e) { showMsg(msg, 'Error de conexión', true); }
+  });
+
+  // Delete account
+  document.getElementById('btn-delete-account').addEventListener('click', async function() {
+    var msg = document.getElementById('delete-msg');
+    msg.style.display = 'none';
+    var pw = document.getElementById('delete-password').value;
+    if (!pw) { showMsg(msg, 'Introduce tu contraseña para confirmar', true); return; }
+    if (!confirm('¿Estás seguro? Se eliminará tu cuenta y todas tus listas. Esta acción no se puede deshacer.')) return;
+
+    try {
+      var hdrs = authHeaders();
+      hdrs['Content-Type'] = 'application/json';
+      var resp = await fetch(ROOT + '/api/v1/auth/me', {
+        method: 'DELETE', headers: hdrs,
+        body: JSON.stringify({ password: pw }),
+      });
+      var data = await resp.json();
+      if (!resp.ok) { showMsg(msg, data.detail || 'Error', true); return; }
+      // Clear auth and redirect
+      localStorage.removeItem('offer_token');
+      window.location.href = ROOT + '/';
+    } catch(e) { showMsg(msg, 'Error de conexión', true); }
+  });
+
+  // Wait for auth to resolve
+  if (window.offerAuth && window.offerAuth.onReady) {
+    window.offerAuth.onReady.push(init);
+  } else {
+    setTimeout(init, 300);
+  }
+})();
+</script>
+
+<style>
+.cuenta-page {
+  max-width: 600px;
+  margin: 0 auto;
+  padding: 1rem 0 3rem;
+}
+.cuenta-title {
+  font-family: var(--font-head);
+  font-size: 1.4rem;
+  margin-bottom: 1.25rem;
+}
+.cuenta-card {
+  background: var(--bg-card);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 1.25rem;
+  margin-bottom: 1rem;
+}
+.cuenta-card-danger {
+  border: 1px solid var(--accent);
+}
+.cuenta-card-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 1rem;
+}
+.cuenta-card-header h2 {
+  font-family: var(--font-head);
+  font-size: 1rem;
+  font-weight: 600;
+  margin: 0;
+}
+.cuenta-card-header svg {
+  color: var(--primary);
+  flex-shrink: 0;
+}
+.cuenta-card-danger .cuenta-card-header svg {
+  color: var(--accent);
+}
+.cuenta-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.cuenta-field {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.4rem 0;
+  border-bottom: 1px solid var(--border);
+}
+.cuenta-field:last-child { border-bottom: none; }
+.cuenta-label {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.cuenta-value {
+  font-weight: 500;
+  font-size: 0.9rem;
+}
+.cuenta-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+.cuenta-form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.cuenta-form-group label {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+.cuenta-btn {
+  align-self: flex-start;
+  padding: 8px 20px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: var(--primary);
+  color: #fff;
+  font-family: var(--font-body);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--transition);
+}
+.cuenta-btn:hover { background: var(--primary-dark); }
+.cuenta-btn-danger {
+  background: var(--accent);
+}
+.cuenta-btn-danger:hover { background: #b33648; }
+.cuenta-msg {
+  font-size: 0.8rem;
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  display: none;
+}
+.cuenta-msg-error {
+  background: #fef2f2;
+  color: var(--accent);
+}
+.cuenta-msg-ok {
+  background: #f0fdf4;
+  color: #16a34a;
+}
+.cuenta-danger-text {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  margin-bottom: 0.75rem;
+}
+.user-dropdown-sep {
+  height: 1px;
+  background: var(--border);
+  margin: 4px 0;
+}
+</style>
+{% endblock %}

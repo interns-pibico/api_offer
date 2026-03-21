@@ -14,6 +14,7 @@ class OfertaCreate(BaseModel):
     imagen_url: str | None = None
     producto_url: str | None = None
     fuente: str
+    categoria: str | None = None
     activo: bool = True
 
 
@@ -29,6 +30,9 @@ class OfertaResponse(BaseModel):
     imagen_url: str | None
     producto_url: str | None
     fuente: str
+    categoria: str | None = None
+    nutriscore: str | None = None
+    novascore: int | None = None
     scraped_at: datetime
     activo: bool
 

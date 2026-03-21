@@ -1,4 +1,4 @@
-/* folletos.js v11 — Flyer extraction with page selector + SSE progress */
+/* folletos.js v12 — Flyer extraction with page selector + SSE progress + upsert */
 (function () {
   'use strict';
 
@@ -374,41 +374,8 @@
       hideProgress();
       if (doneData) {
         renderExtract(doneData);
-
-        // Handle duplicates — ask user if they want to update
-        if (doneData.duplicates > 0 && save) {
-          const names = doneData.duplicate_names.slice(0, 5).join('\n  - ');
-          const more = doneData.duplicates > 5 ? `\n  ...y ${doneData.duplicates - 5} más` : '';
-          const ok = confirm(
-            `${doneData.duplicates} producto(s) ya existían en la base de datos:\n  - ${names}${more}\n\n` +
-            `¿Deseas actualizar sus precios con los datos del folleto?`
-          );
-          if (ok) {
-            // Collect duplicate products from all pages
-            const dupeNames = new Set(doneData.duplicate_names);
-            const dupeProducts = [];
-            for (const page of doneData.pages) {
-              for (const p of page.products) {
-                if (dupeNames.has(p.producto_nombre)) {
-                  dupeProducts.push(p);
-                }
-              }
-            }
-            try {
-              const upRes = await fetch(`${ROOT}/api/v1/flyers/update-duplicates`, {
-                method: 'POST',
-                headers: { 'X-API-Key': apiKey, 'Content-Type': 'application/json' },
-                body: JSON.stringify({ fuente: doneData.source, products: dupeProducts }),
-              });
-              if (upRes.ok) {
-                const upData = await upRes.json();
-                alert(`${upData.updated} producto(s) actualizados correctamente.`);
-              }
-            } catch { /* ignore */ }
-          }
-        }
       } else {
-        showError('No se recibió respuesta del servidor');
+        showError('No se recibio respuesta del servidor');
       }
 
     } catch (err) {
@@ -443,13 +410,19 @@
 
     let statsHtml = `
       <div class="flyer-stat"><span class="flyer-stat-val">${data.total_products_found}</span><span class="flyer-stat-lbl">Productos</span></div>
-      <div class="flyer-stat"><span class="flyer-stat-val">${data.pages_processed}/${data.total_pages}</span><span class="flyer-stat-lbl">Páginas</span></div>
-      <div class="flyer-stat"><span class="flyer-stat-val">${data.saved}</span><span class="flyer-stat-lbl">Nuevos guardados</span></div>
+      <div class="flyer-stat"><span class="flyer-stat-val">${data.pages_processed}/${data.total_pages}</span><span class="flyer-stat-lbl">Paginas</span></div>
+      <div class="flyer-stat"><span class="flyer-stat-val">${data.saved || 0}</span><span class="flyer-stat-lbl">Nuevos</span></div>
     `;
-    if (data.duplicates > 0) {
-      statsHtml += `<div class="flyer-stat"><span class="flyer-stat-val">${data.duplicates}</span><span class="flyer-stat-lbl">Ya existían</span></div>`;
+    if (data.updated > 0) {
+      statsHtml += `<div class="flyer-stat"><span class="flyer-stat-val">${data.updated}</span><span class="flyer-stat-lbl">Actualizados</span></div>`;
+    }
+    if (data.deactivated > 0) {
+      statsHtml += `<div class="flyer-stat"><span class="flyer-stat-val">${data.deactivated}</span><span class="flyer-stat-lbl">Anteriores reemplazados</span></div>`;
     }
     statsHtml += `<div class="flyer-stat"><span class="flyer-stat-val">${data.source}</span><span class="flyer-stat-lbl">Fuente</span></div>`;
+    if (data.cost_usd != null) {
+      statsHtml += `<div class="flyer-stat"><span class="flyer-stat-val">$${data.cost_usd.toFixed(4)}</span><span class="flyer-stat-lbl">Coste IA</span></div>`;
+    }
     document.getElementById('results-stats').innerHTML = statsHtml;
 
     let html = '';

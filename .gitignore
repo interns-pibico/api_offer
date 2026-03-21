@@ -56,3 +56,4 @@ alembic/tmp/
 .coverage
 htmlcov/
 .pytest_cache/
+carrefour_browser_state.json

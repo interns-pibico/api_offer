@@ -9,6 +9,8 @@ from sqlalchemy.ext.asyncio import create_async_engine
 
 from src.db.session import Base
 import src.models.oferta  # noqa: F401
+import src.models.user  # noqa: F401
+import src.models.shopping_list  # noqa: F401
 
 config = context.config
 

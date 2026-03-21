@@ -274,6 +274,28 @@
 </div>
 
 <!-- ══════════════════════════════════════════════════════════
+     CATEGORÍAS
+     ═══════════════════════════════════════════════════════════ -->
+<section class="landing-section landing-categorias">
+  <div class="landing-section-header">
+    <span class="section-eyebrow">Explora por categoría</span>
+    <h2 class="landing-section-title">¿Qué buscas hoy?</h2>
+  </div>
+  <div class="cat-pills-wrap" id="cat-pills-wrap">
+    <a href="{{ root_path }}/ofertas?categoria=Lácteos" class="cat-pill"><span class="cat-pill-icon">🥛</span> Lácteos</a>
+    <a href="{{ root_path }}/ofertas?categoria=Carnes" class="cat-pill"><span class="cat-pill-icon">🥩</span> Carnes</a>
+    <a href="{{ root_path }}/ofertas?categoria=Pescados y mariscos" class="cat-pill"><span class="cat-pill-icon">🐟</span> Pescados</a>
+    <a href="{{ root_path }}/ofertas?categoria=Frutas y verduras" class="cat-pill"><span class="cat-pill-icon">🍎</span> Frutas y verduras</a>
+    <a href="{{ root_path }}/ofertas?categoria=Bebidas" class="cat-pill"><span class="cat-pill-icon">🥤</span> Bebidas</a>
+    <a href="{{ root_path }}/ofertas?categoria=Panadería y bollería" class="cat-pill"><span class="cat-pill-icon">🥐</span> Panadería</a>
+    <a href="{{ root_path }}/ofertas?categoria=Conservas y despensa" class="cat-pill"><span class="cat-pill-icon">🫒</span> Conservas</a>
+    <a href="{{ root_path }}/ofertas?categoria=Congelados" class="cat-pill"><span class="cat-pill-icon">🧊</span> Congelados</a>
+    <a href="{{ root_path }}/ofertas?categoria=Charcutería y embutidos" class="cat-pill"><span class="cat-pill-icon">🥓</span> Charcutería</a>
+    <a href="{{ root_path }}/ofertas?categoria=Snacks y aperitivos" class="cat-pill"><span class="cat-pill-icon">🥜</span> Snacks</a>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════
      CÓMO FUNCIONA
      ═══════════════════════════════════════════════════════════ -->
 <section class="landing-section">
@@ -463,7 +485,7 @@
 
 {% block scripts %}
 <script>window.__ROOT_PATH__ = "{{ root_path }}";</script>
-<script src="{{ root_path }}/static/js/landing.js?v=2"></script>
+<script src="{{ root_path }}/static/js/landing.js?v=3"></script>
 <script src="{{ root_path }}/static/js/chart.umd.min.js"></script>
-<script src="{{ root_path }}/static/js/evolucion.js?v=10"></script>
+<script src="{{ root_path }}/static/js/evolucion.js?v=11"></script>
 {% endblock %}

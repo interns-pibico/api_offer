@@ -1,0 +1,151 @@
+{% extends "base.html" %}
+{% block title %}Iniciar sesión{% endblock %}
+
+{% block content %}
+
+<div class="login-page">
+  <div class="login-card">
+    <h2 class="login-title">Bienvenido</h2>
+
+    <!-- Tabs -->
+    <div class="login-tabs">
+      <button class="login-tab active" id="tab-login" data-tab="login">Iniciar sesión</button>
+      <button class="login-tab" id="tab-register" data-tab="register">Crear cuenta</button>
+    </div>
+
+    <!-- Login form -->
+    <form id="form-login" class="login-form">
+      <div class="form-group">
+        <label for="login-username">Usuario</label>
+        <input type="text" id="login-username" class="form-input" placeholder="Tu nombre de usuario" required autocomplete="username">
+      </div>
+      <div class="form-group">
+        <label for="login-password">Contraseña</label>
+        <input type="password" id="login-password" class="form-input" placeholder="Tu contraseña" required autocomplete="current-password">
+      </div>
+      <div id="login-error" class="form-error" style="display:none"></div>
+      <button type="submit" class="login-submit">Iniciar sesión</button>
+    </form>
+
+    <!-- Register form -->
+    <form id="form-register" class="login-form" style="display:none">
+      <div class="form-group">
+        <label for="reg-username">Usuario</label>
+        <input type="text" id="reg-username" class="form-input" placeholder="Elige un nombre de usuario" required autocomplete="username" minlength="3">
+      </div>
+      <div class="form-group">
+        <label for="reg-email">Email</label>
+        <input type="email" id="reg-email" class="form-input" placeholder="tu@email.com" required autocomplete="email">
+      </div>
+      <div class="form-group">
+        <label for="reg-password">Contraseña</label>
+        <input type="password" id="reg-password" class="form-input" placeholder="Mínimo 6 caracteres" required autocomplete="new-password" minlength="6">
+      </div>
+      <div id="register-error" class="form-error" style="display:none"></div>
+      <button type="submit" class="login-submit">Crear cuenta</button>
+    </form>
+
+    <div class="login-footer">
+      <a href="{{ root_path }}/">Volver al inicio</a>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+  'use strict';
+
+  var ROOT = window.OFFER_ROOT || '';
+  var tabs = document.querySelectorAll('.login-tab');
+  var formLogin = document.getElementById('form-login');
+  var formRegister = document.getElementById('form-register');
+  var loginError = document.getElementById('login-error');
+  var registerError = document.getElementById('register-error');
+
+  // If arriving at /registro, show register tab
+  if (window.location.pathname.endsWith('/registro')) {
+    switchTab('register');
+  }
+
+  tabs.forEach(function (tab) {
+    tab.addEventListener('click', function () {
+      switchTab(this.dataset.tab);
+    });
+  });
+
+  function switchTab(name) {
+    tabs.forEach(function (t) { t.classList.toggle('active', t.dataset.tab === name); });
+    formLogin.style.display = name === 'login' ? '' : 'none';
+    formRegister.style.display = name === 'register' ? '' : 'none';
+    loginError.style.display = 'none';
+    registerError.style.display = 'none';
+  }
+
+  function showError(el, msg) {
+    el.textContent = msg;
+    el.style.display = '';
+  }
+
+  function getRedirect() {
+    var params = new URLSearchParams(window.location.search);
+    return params.get('next') || ROOT + '/listas';
+  }
+
+  // Login
+  formLogin.addEventListener('submit', async function (e) {
+    e.preventDefault();
+    loginError.style.display = 'none';
+    var username = document.getElementById('login-username').value.trim();
+    var password = document.getElementById('login-password').value;
+
+    try {
+      var resp = await fetch(ROOT + '/api/v1/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: 'username=' + encodeURIComponent(username) + '&password=' + encodeURIComponent(password),
+      });
+      var data = await resp.json();
+      if (!resp.ok) {
+        showError(loginError, data.detail || 'Error al iniciar sesión');
+        return;
+      }
+      localStorage.setItem('offer_token', data.access_token);
+      window.location.href = getRedirect();
+    } catch (err) {
+      showError(loginError, 'Error de conexión');
+    }
+  });
+
+  // Register
+  formRegister.addEventListener('submit', async function (e) {
+    e.preventDefault();
+    registerError.style.display = 'none';
+    var username = document.getElementById('reg-username').value.trim();
+    var email = document.getElementById('reg-email').value.trim();
+    var password = document.getElementById('reg-password').value;
+
+    try {
+      var resp = await fetch(ROOT + '/api/v1/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: username, email: email, password: password }),
+      });
+      var data = await resp.json();
+      if (!resp.ok) {
+        var msg = data.detail;
+        if (Array.isArray(msg)) msg = msg.map(function (d) { return d.msg || d; }).join(', ');
+        showError(registerError, msg || 'Error al crear cuenta');
+        return;
+      }
+      localStorage.setItem('offer_token', data.access_token);
+      window.location.href = getRedirect();
+    } catch (err) {
+      showError(registerError, 'Error de conexión');
+    }
+  });
+})();
+</script>
+{% endblock %}

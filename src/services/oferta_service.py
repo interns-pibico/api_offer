@@ -112,16 +112,52 @@ _ROBOT_CACHE: dict[str, RobotFileParser] = {}
 
 
 def _check_robots_txt(base_url: str, path: str = "/") -> bool:
-    """Check if robots.txt allows scraping the given path for our bot UA."""
+    """Check if robots.txt allows scraping the given path for our bot UA.
+
+    Uses a manual parser instead of RobotFileParser because many sites
+    (e.g. Carrefour) use non-standard wildcard Disallow lines and multiple
+    ``User-agent: *`` blocks that confuse Python's built-in parser.
+    """
     if base_url not in _ROBOT_CACHE:
-        rp = RobotFileParser()
-        rp.set_url(f"{base_url}/robots.txt")
         try:
-            rp.read()
+            import urllib.request
+            req = urllib.request.Request(
+                f"{base_url}/robots.txt",
+                headers={"User-Agent": _BOT_UA},
+            )
+            raw = urllib.request.urlopen(req, timeout=10).read().decode("utf-8", errors="replace")
+            # Collect all Disallow paths that apply to User-agent: *
+            disallow_paths: list[str] = []
+            current_agents: set[str] = set()
+            prev_was_ua = False
+            for line in raw.splitlines():
+                stripped = line.strip()
+                if not stripped or stripped.startswith("#"):
+                    continue
+                if stripped.lower().startswith("user-agent"):
+                    agent = stripped.split(":", 1)[1].strip().lower()
+                    if not prev_was_ua:
+                        current_agents.clear()  # new group
+                    current_agents.add(agent)
+                    prev_was_ua = True
+                elif stripped.lower().startswith("disallow"):
+                    prev_was_ua = False
+                    if "*" not in current_agents:
+                        continue
+                    value = stripped.split(":", 1)[1].strip() if ":" in stripped else ""
+                    if value and not value.startswith("*"):
+                        disallow_paths.append(value.rstrip("*"))
+                else:
+                    prev_was_ua = False
+            _ROBOT_CACHE[base_url] = disallow_paths
         except Exception:
-            return True  # If robots.txt is unreachable, allow
-        _ROBOT_CACHE[base_url] = rp
-    return _ROBOT_CACHE[base_url].can_fetch(_BOT_UA, path)
+            _ROBOT_CACHE[base_url] = []  # unreachable → allow all
+
+    disallow_paths = _ROBOT_CACHE[base_url]
+    for blocked in disallow_paths:
+        if path.startswith(blocked):
+            return False
+    return True
 
 
 # ---------------------------------------------------------------------------
@@ -171,11 +207,13 @@ _UNIVERSAL_NON_FOOD_KEYWORDS: frozenset[str] = frozenset({
     "cepillo dental", "cepillo dientes", "cepillo de dientes",
     "enjuague bucal", "colutorio",
     "eau de parfum", "eau de toilette", "agua de colonia", "agua de tocador",
-    "colonia infantil",
+    "colonia infantil", "colonia ", "estuche colonia",
     "maquinilla de afeitar", "maquinillas de afeitar", "cuchillas de afeitar",
     "aftershave", "espuma de afeitar",
-    "crema corporal", "crema de manos", "crema hidratante corporal",
-    "crema depilatoria", "depilación", "depilacion", "recambios maquinilla",
+    "crema corporal", "crema de manos", "crema hidratante",
+    "crema depilatoria", "crema facial", "crema antiarrugas", "crema antiedad",
+    "crema sin aclarado", "crema definidora", "crema styling",
+    "depilación", "depilacion", "recambios maquinilla",
     "loción corporal", "locion corporal", "protector solar", "bronceador",
     "compresas", "compresa ", "tampón", "tampon", "copa menstrual",
     "pañal", "panal", "pañales",
@@ -239,6 +277,106 @@ _UNIVERSAL_NON_FOOD_KEYWORDS: frozenset[str] = frozenset({
     "alimento gato", "alimento perro",
     "comida perro", "comida gato", "comida para perro", "comida para gato",
     "snack perro", "snack gato",
+    # Electrónica / electrodomésticos
+    "televisión", "television", "televisor", "smart tv", "monitor",
+    "frigorífico", "frigorifico", "congelador vertical", "microondas",
+    "lavadora", "secadora", "lavavajillas", "aspirador", "robot aspirador",
+    "plancha de ropa", "plancha vapor", "ventilador", "calefactor",
+    "aire acondicionado", "radiador", "estufa",
+    "batidora amasadora", "batidora de mano", "licuadora", "tostadora", "cafetera eléctrica", "freidora de aire", "freidora sin aceite",
+    "horno eléctrico", "horno electrico", "sandwichera", "grill eléctrico",
+    "robot de cocina", "thermomix", "procesador alimentos",
+    "báscula", "bascula", "termómetro", "termometro",
+    "espumador", "hervidora", "hervidor",
+    # Ropa / textil
+    "pijama", "camiseta", "pantalón", "pantalon", "vestido", "falda",
+    "chaqueta", "abrigo", "jersey", "sudadera", "cazadora", "anorak",
+    "bañador", "banador", "bikini", "ropa interior", "calcetines",
+    "zapatillas", "zapatos", "botas", "sandalias", "chanclas",
+    "toalla", "sábana", "sabana", "edredón", "edredon", "almohada",
+    "cojín", "cojin", "colcha", "mantel", "cortina",
+    # Papelería / juguetes / decoración
+    "rotulador", "bolígrafo", "boligrafo", "lápiz", "lapiz", "cuaderno",
+    "carpeta", "pegamento", "tijeras", "cinta adhesiva",
+    "juguete", "muñeco", "muneco", "puzzle", "juego de mesa", "juegos de lógica",
+    "peluche", "figurita decorativa", "figura decorativa",
+    "vela decorativa", "vela aromática", "vela aromatica",
+    "marco de fotos", "portafotos", "jarrón", "jarron",
+    "luz decorativa", "lámpara", "lampara", "portavela",
+    # Jardín / bricolaje / herramientas
+    "maceta", "planta artificial", "semillas de césped", "tierra vegetal", "sustrato",
+    "manguera", "regadera", "tijeras de poda", "cortacésped", "cortacesped",
+    "limpiador a presión", "limpiador a presion", "hidrolimpiadora",
+    "taladro", "destornillador", "martillo", "llave inglesa",
+    "tornillo", "clavo", "broca", "sierra eléctrica", "sierra electrica", "sierra circular",
+    "pintura plástica", "pintura plastica", "brocha pintura", "rodillo de pintura",
+    # Otros no alimenticios
+    "maleta", "mochila escolar", "bolso", "cartera",
+    "gafas de sol", "paraguas", "reloj",
+    "batería de cocina", "set de cocina",
+    "contenedor", "organizador", "caja de almacenaje",
+    "alfombra", "felpudo", "perchero", "tendedero",
+    "cera ", "espuma de pelo", "gomina", "laca de pelo",
+    "gel fijador",
+    "protegeslip",
+    # Electrodomésticos / electrónica extra
+    "arcón congelador", "arcon congelador", "qilive",
+    "smartphone", "samsung galaxy", "xiaomi redmi", "iphone", "huawei",
+    # Muebles jardín / exterior extra
+    "conjunto de resina", "sillón colgante", "sillon colgante",
+    "keter", "kactus republic", "gardenstar",
+    "cenador", "gazebo", "banco plegable",
+    # Menaje extra
+    "mug gres", "mug 32cl",
+    # Libros / editorial
+    "penguin books", "ediciones b", "logista.", "timunmas",
+    "premio nadal", "premio planeta",
+    # Juguetes extra
+    "lego ninjago", "playmobil ",
+    "gofrera", "crepera", "sandwichera", "grill eléctrico", "grill electrico",
+    "kit de pastelería", "kit pastelería", "accesorios de repostería",
+    "utensilios de silicona",
+    # Marcas non-food (Aldi private labels, limpieza)
+    "ambiano", "crofton", "ferrex", "gardenline",
+    "disiclin",
+    # Higiene adicional (marcas concretas)
+    "sanex ", "espuma giorgi", "espuma pantene", "laca elnett", "laca revlon",
+    "mascarilla pantene", "mascarilla herbal", "mascarilla giorgi", "mascarilla nutritiva",
+    "ampollas pantene", "exfoliante corporal",
+    "bastoncillos", "máquina afeitar", "maquina afeitar", "gillette",
+    "salvaslip", "protege slip", "protege-slip",
+    # Limpieza adicional
+    "fregasuelo", "quita grasas", "quitagrasas",
+    "bolsa basura", "papel cocina", "pañuelos papel", "panuelos papel",
+    "bolsa para congelar", "almidón toke", "almidon toke",
+    # Menaje/cristalería (no es el contenido sino el recipiente)
+    "copa de vino", "copa de cerveza", "copa de cava", "copa de vidrio",
+    "copa de cristal", "copa vidrio", "copa flauta", "copa para gin",
+    "vaso de cristal",
+    "botella de vidrio", "botella de cristal", "jarra de cristal",
+    # Cosmética adicional
+    "agua micelar", "micelar", "sérum", "serum", "mascarilla capilar",
+    "acondicionador capilar", "skin active", "garnier skin",
+    # Cosmética facial/corporal adicional
+    "sérum facial", "serum facial",
+    "crema l'oreal", "crema nivea", "crema deliplus", "lote facial",
+    "contorno de ojos", "mascarilla facial", "exfoliante facial",
+    "laca pantene", "laca de cabello",
+    "espuma facial", "gel limpiador facial",
+    "gel definidor", "after shave", "aftershave",
+    "cepillo colgate", "cepillo oral", "cepillo eléctrico", "cepillo electrico",
+    "kit dental",
+    # Salud / parafarmacia
+    "protector cama", "protector incontinencia", "pañal adulto",
+    "guantes de nitrilo", "guantes multiusos", "guantes desechables",
+    "mascarilla ffp", "mascarilla quirúrgica", "mascarilla quirurgica",
+    "termómetro digital", "tensiómetro",
+    # Libros / revistas
+    "planeta,", "serie memento", "libro ", "revista ",
+    # Muebles jardín adicional
+    "conjunto de jardín", "conjunto de jardin", "conjunto jardín",
+    "silla de jardín", "mesa de jardín",
+    "plantas con flor", "planta con flor",
 })
 
 
@@ -362,6 +500,32 @@ async def scrape_mercadona(warehouse: str = _DEFAULT_WH) -> list[OfertaCreate]:
                     logger.debug("Category %s: %d price-drop products", cat_id, len(offers))
             await asyncio.sleep(_DELAY_BETWEEN_REQUESTS)
 
+        # Enrich with EAN from product detail endpoint
+        enriched = 0
+        for offer in all_offers:
+            if offer.barcode:
+                continue
+            # Extract numeric product ID from share_url
+            pid = None
+            if offer.producto_url:
+                m = re.search(r"/product/(\d+)/", offer.producto_url)
+                if m:
+                    pid = m.group(1)
+            if not pid:
+                continue
+            try:
+                detail_url = f"{_BASE_API.replace('/categories/', '/products/')}"
+                detail_url = f"https://tienda.mercadona.es/api/products/{pid}/?lang={_LANG}&wh={warehouse}"
+                detail = await _fetch_json(client, detail_url)
+                if detail and detail.get("ean"):
+                    offer.barcode = str(detail["ean"])
+                    enriched += 1
+                await asyncio.sleep(_DELAY_BETWEEN_REQUESTS)
+            except Exception:
+                pass
+        if enriched:
+            logger.info("Mercadona: enriched %d/%d offers with EAN", enriched, len(all_offers))
+
     logger.info("Mercadona scrape complete: %d price-drop offers", len(all_offers))
     return all_offers
 
@@ -372,29 +536,33 @@ async def scrape_mercadona(warehouse: str = _DEFAULT_WH) -> list[OfertaCreate]:
 
 _CARREFOUR_BASE = "https://www.carrefour.es"
 _CARREFOUR_FUENTE = "www.carrefour.es"
-_CARREFOUR_API_BASE = "https://www.carrefour.es/cloud-api/plp-food-papi/v1"
-_CARREFOUR_HEADERS = {
-    "Accept": "application/json, text/plain, */*",
-    "Accept-Language": "es-ES,es;q=0.9,en;q=0.8",
-    "Referer": "https://www.carrefour.es/supermercado/ofertas/cat20968591/c",
-    "Origin": "https://www.carrefour.es",
-}
-# Anonymous session cookies — no login required, just establishes salepoint (Madrid)
-_CARREFOUR_COOKIES = {
-    "Wizard": "true",
-    "salepoint": "005290||28232|A_DOMICILIO|0",
-}
-_CARREFOUR_PAGE_SIZE = 24  # API returns max 24 per page
-_CARREFOUR_DELAY = 0.35
 
-_CARREFOUR_PROMO_PATHS: list[str] = [
+# Only FOOD promo categories (no perfumeria, limpieza, mascotas, bebe)
+_CARREFOUR_FOOD_PATHS: list[str] = [
     "/supermercado/productos-frescos-promocion/F-10flZ13rjo/c",
     "/supermercado/la-despensa-promocion/F-13ji8Z13rjo/c",
     "/supermercado/bebidas-promocion/F-1086Z13rjo/c",
     "/supermercado/congelados-promocion/F-12r0pZ13rjo/c",
-    "/supermercado/perfumeria-e-higiene-promocion/F-107gZ13rjo/c",
-    "/supermercado/limpieza-y-hogar-promocion/F-10gcZ13rjo/c",
 ]
+
+# JS to extract product data from Carrefour DOM
+_CARREFOUR_EXTRACT_JS = """() => {
+    const cards = document.querySelectorAll('.product-card-list__item, [data-testid="product-card"]');
+    return Array.from(cards).map(card => {
+        const nameEl = card.querySelector('.product-card__title, .product-card__title-link, [class*="product-card__title"]');
+        const priceEl = card.querySelector('.product-card__price--current, .product-card__price, [class*="price-current"], [data-testid="current-price"]');
+        const oldPriceEl = card.querySelector('.product-card__price--strikethrough, .product-card__price--old, [class*="strikethrough"], s, del, [data-testid="strikethrough-price"]');
+        const imgEl = card.querySelector('img');
+        const linkEl = card.querySelector('a[href*="/supermercado/"]');
+        return {
+            name: nameEl ? nameEl.textContent.trim() : null,
+            price: priceEl ? priceEl.textContent.trim() : null,
+            oldPrice: oldPriceEl ? oldPriceEl.textContent.trim() : null,
+            imgSrc: imgEl ? (imgEl.src || imgEl.dataset.src || '') : null,
+            href: linkEl ? linkEl.href : null,
+        };
+    }).filter(p => p.name && p.price);
+}"""
 
 
 def _parse_carrefour_price(price_str: str) -> float | None:
@@ -416,7 +584,8 @@ def _parse_carrefour_price(price_str: str) -> float | None:
         return None
 
 
-def _carrefour_item_to_oferta(item: dict) -> OfertaCreate | None:
+def _carrefour_dom_item_to_oferta(item: dict) -> OfertaCreate | None:
+    """Convert a DOM-extracted product dict to OfertaCreate."""
     nombre = " ".join((item.get("name") or "").strip().split())
     if not nombre or len(nombre) < 3 or len(nombre) > 500:
         return None
@@ -424,7 +593,7 @@ def _carrefour_item_to_oferta(item: dict) -> OfertaCreate | None:
         return None
 
     precio_oferta = _parse_carrefour_price(item.get("price"))
-    precio_original = _parse_carrefour_price(item.get("strikethrough_price"))
+    precio_original = _parse_carrefour_price(item.get("oldPrice"))
 
     if precio_oferta is None or precio_oferta <= 0:
         return None
@@ -433,13 +602,13 @@ def _carrefour_item_to_oferta(item: dict) -> OfertaCreate | None:
 
     descuento = _calculate_discount(precio_original, precio_oferta)
 
-    product_path = item.get("url") or ""
-    if product_path and not product_path.startswith("http"):
-        product_url: str | None = f"{_CARREFOUR_BASE}{product_path}"
+    href = item.get("href") or ""
+    if href and not href.startswith("http"):
+        product_url: str | None = f"{_CARREFOUR_BASE}{href}"
     else:
-        product_url = product_path or None
+        product_url = href or None
 
-    imagen_url: str | None = (item.get("images") or {}).get("desktop") or None
+    imagen_url = item.get("imgSrc") or None
 
     return OfertaCreate(
         producto_nombre=nombre,
@@ -453,47 +622,49 @@ def _carrefour_item_to_oferta(item: dict) -> OfertaCreate | None:
     )
 
 
-async def _scrape_carrefour_category_pw(
+async def _scrape_carrefour_category_dom(
     page,
-    api_path: str,
+    path: str,
     seen_urls: set[str],
 ) -> list[OfertaCreate]:
-    """Scrape one Carrefour promo category using a Playwright page (real browser)."""
-    base_url = f"{_CARREFOUR_API_BASE}{api_path}"
+    """Scrape one Carrefour food promo category by navigating the real HTML page."""
+    url = f"{_CARREFOUR_BASE}{path}"
     offers: list[OfertaCreate] = []
-    offset = 0
-    total_results: int | None = None
+    page_num = 0
+    max_pages = 15
 
-    while True:
-        url = f"{base_url}?offset={offset}&rows={_CARREFOUR_PAGE_SIZE}"
-        data = None
+    while page_num < max_pages:
+        page_url = url if page_num == 0 else f"{url}?offset={page_num * 24}"
         try:
-            resp = await page.goto(url, wait_until="domcontentloaded", timeout=30_000)
-            if resp is None:
-                logger.warning("Carrefour: no response for %s", url)
-                return offers
-            if resp.status == 404:
-                logger.info("Carrefour category not found: %s", api_path)
-                return offers
-            if resp.status != 200:
-                logger.warning("Carrefour %s on %s", resp.status, url)
-                return offers
-            body = await page.inner_text("body")
-            data = json.loads(body)
+            await page.goto(page_url, wait_until="domcontentloaded", timeout=30_000)
+            # Wait for product cards to render (Vue.js lazy loading)
+            try:
+                await page.wait_for_selector(
+                    '.product-card-list__item, [data-testid="product-card"]',
+                    timeout=10_000,
+                )
+            except Exception:
+                logger.debug("Carrefour: no product cards found on %s", page_url)
+                break
+
+            # Scroll down to trigger lazy loading of all cards on this page
+            for _ in range(3):
+                await page.evaluate("window.scrollBy(0, window.innerHeight)")
+                await asyncio.sleep(0.5)
+
+            # Extract products from DOM
+            items = await page.evaluate(_CARREFOUR_EXTRACT_JS)
+
         except Exception as exc:
-            logger.warning("Carrefour request failed for %s: %s", url, exc)
-            return offers
+            logger.warning("Carrefour DOM scrape failed for %s: %s", page_url, exc)
+            break
 
-        results: dict = data.get("results") or {}
-        items: list[dict] = results.get("items") or []
-        pagination: dict = results.get("pagination") or {}
+        if not items:
+            break
 
-        if total_results is None:
-            total_results = pagination.get("total_results", 0)
-            logger.debug("Carrefour %s: %d total products", api_path, total_results)
-
+        new_on_page = 0
         for item in items:
-            oferta = _carrefour_item_to_oferta(item)
+            oferta = _carrefour_dom_item_to_oferta(item)
             if oferta is None:
                 continue
             key = oferta.producto_url or oferta.producto_nombre
@@ -501,85 +672,80 @@ async def _scrape_carrefour_category_pw(
                 continue
             seen_urls.add(key)
             offers.append(oferta)
+            new_on_page += 1
 
-        offset += _CARREFOUR_PAGE_SIZE
-        if not items or (total_results is not None and offset >= total_results):
+        logger.debug("Carrefour %s page %d: %d items, %d new offers", path, page_num, len(items), new_on_page)
+
+        # If we got fewer items than a full page, we're done
+        if len(items) < 20:
             break
 
-        await asyncio.sleep(_CARREFOUR_DELAY)
+        page_num += 1
+        await asyncio.sleep(1.5)
 
     return offers
 
 
 async def scrape_carrefour() -> list[OfertaCreate]:
-    """Scrape Carrefour Spain for genuine price-drop offers via cloud-api JSON.
+    """Scrape Carrefour Spain for genuine price-drop offers using Playwright DOM extraction.
 
-    Uses Playwright with a real Chromium browser to legitimately pass
-    Cloudflare Bot Management. Anonymous salepoint cookie establishes
-    region (Madrid 28232) for consistent results.
+    Navigates the real HTML pages with a headless Chromium browser to bypass
+    Cloudflare. Only scrapes food categories. Extracts products with visible
+    strikethrough prices (real discounts only).
     """
-    if not _check_robots_txt("https://www.carrefour.es", "/cloud-api/"):
-        logger.warning("robots.txt de Carrefour prohíbe scraping, abortando")
-        return []
-
     from playwright.async_api import async_playwright
 
     all_offers: list[OfertaCreate] = []
     seen_urls: set[str] = set()
 
-    async with async_playwright() as pw:
-        browser = await pw.chromium.launch(
-            headless=False,
-            args=["--disable-blink-features=AutomationControlled"],
-        )
-        context = await browser.new_context(
-            viewport={"width": 1280, "height": 800},
-            locale="es-ES",
-            timezone_id="Europe/Madrid",
-        )
+    import os
+    _STATE_FILE = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "carrefour_browser_state.json")
 
-        # Set salepoint cookies (anonymous, no login — just region)
-        await context.add_cookies([
-            {
-                "name": "Wizard",
-                "value": "true",
-                "domain": ".carrefour.es",
-                "path": "/",
-            },
-            {
-                "name": "salepoint",
-                "value": "005290||28232|A_DOMICILIO|0",
-                "domain": ".carrefour.es",
-                "path": "/",
-            },
-        ])
-
-        page = await context.new_page()
-
-        # Warm up: visit the main site to establish Cloudflare session
-        try:
-            await page.goto(
-                "https://www.carrefour.es/supermercado/ofertas/cat20968591/c",
-                wait_until="domcontentloaded",
-                timeout=30_000,
+    try:
+        async with async_playwright() as pw:
+            browser = await pw.chromium.launch(
+                headless=False,
+                args=["--disable-blink-features=AutomationControlled", "--no-sandbox"],
             )
-            await asyncio.sleep(2)
-        except Exception as exc:
-            logger.warning("Carrefour: warmup page load failed: %s", exc)
 
-        for api_path in _CARREFOUR_PROMO_PATHS:
-            logger.info("Carrefour: scraping promo category %s", api_path)
-            offers = await _scrape_carrefour_category_pw(page, api_path, seen_urls)
-            all_offers.extend(offers)
-            logger.info(
-                "Carrefour %s: %d price-drop offers (total so far: %d)",
-                api_path.split("/")[2],
-                len(offers),
-                len(all_offers),
-            )
-            await asyncio.sleep(_CARREFOUR_DELAY)
+            # Reuse saved browser state (cookies from MCP session that passed Cloudflare)
+            ctx_kwargs = {
+                "viewport": {"width": 1280, "height": 800},
+                "locale": "es-ES",
+                "timezone_id": "Europe/Madrid",
+                "user_agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            }
+            if os.path.exists(_STATE_FILE):
+                ctx_kwargs["storage_state"] = _STATE_FILE
+                logger.info("Carrefour: using saved browser state from %s", _STATE_FILE)
+            else:
+                logger.warning("Carrefour: no saved browser state, starting fresh")
 
-        await browser.close()
+            context = await browser.new_context(**ctx_kwargs)
+
+            # Fallback cookies if no state file
+            if not os.path.exists(_STATE_FILE):
+                await context.add_cookies([
+                    {"name": "Wizard", "value": "true", "domain": ".carrefour.es", "path": "/"},
+                    {"name": "salepoint", "value": "005290||28232|A_DOMICILIO|0", "domain": ".carrefour.es", "path": "/"},
+                ])
+
+            page = await context.new_page()
+
+            for cat_path in _CARREFOUR_FOOD_PATHS:
+                logger.info("Carrefour: scraping %s", cat_path)
+                try:
+                    offers = await _scrape_carrefour_category_dom(page, cat_path, seen_urls)
+                    all_offers.extend(offers)
+                    logger.info("Carrefour %s: %d offers (total: %d)", cat_path.split("/")[2], len(offers), len(all_offers))
+                except Exception as exc:
+                    logger.warning("Carrefour category %s failed: %s", cat_path, exc)
+                await asyncio.sleep(2)
+
+            await browser.close()
+
+    except Exception as exc:
+        logger.error("Carrefour scrape failed: %s", exc)
 
     logger.info("Carrefour scrape complete: %d price-drop offers", len(all_offers))
     return all_offers
@@ -1998,6 +2164,8 @@ async def save_offers(
     db: AsyncSession,
 ) -> tuple[int, int, int]:
     """Upsert scraped offers. Returns (saved, duplicates_skipped, deactivated)."""
+    from src.services.category_classifier import classify
+
     repo = OfertaRepository(db)
 
     deactivated = await repo.deactivate_by_fuente(fuente)
@@ -2007,6 +2175,18 @@ async def save_offers(
     duplicates = 0
 
     for offer_data in offers:
+        # Skip offers without real discount (no original price AND no discount %)
+        if offer_data.precio_original is None and offer_data.descuento_porcentaje is None:
+            continue
+
+        # Skip non-food products (second barrier in case scraper missed it)
+        if _is_non_food(offer_data.producto_nombre):
+            continue
+
+        # Auto-classify category if not set
+        if not offer_data.categoria:
+            offer_data.categoria = classify(offer_data.producto_nombre)
+
         existing = None
         if offer_data.producto_url:
             existing = await repo.get_by_url_and_fuente(offer_data.producto_url, fuente)
@@ -2019,6 +2199,7 @@ async def save_offers(
             existing.precio_oferta = offer_data.precio_oferta
             existing.descuento_porcentaje = offer_data.descuento_porcentaje
             existing.imagen_url = offer_data.imagen_url
+            existing.categoria = offer_data.categoria
             existing.activo = True
             from datetime import datetime, timezone
             existing.scraped_at = datetime.now(timezone.utc)
@@ -2050,12 +2231,317 @@ async def list_ofertas(
     activo: bool | None = None,
     barcode: str | None = None,
     q: str | None = None,
+    categoria: str | None = None,
+    nutriscore: str | None = None,
     sort: str = "descuento_desc",
     offset: int = 0,
     limit: int = 20,
 ) -> tuple[list, int]:
     repo = OfertaRepository(db)
-    return await repo.get_all(fuente=fuente, activo=activo, barcode=barcode, q=q, sort=sort, offset=offset, limit=limit)
+    return await repo.get_all(
+        fuente=fuente, activo=activo, barcode=barcode, q=q,
+        categoria=categoria, nutriscore=nutriscore,
+        sort=sort, offset=offset, limit=limit,
+    )
+
+
+async def list_categorias(db: AsyncSession) -> list[str]:
+    repo = OfertaRepository(db)
+    return await repo.get_categorias()
+
+
+async def classify_existing_offers(db: AsyncSession) -> int:
+    """Classify all active offers that don't have a category yet."""
+    from src.services.category_classifier import classify
+
+    repo = OfertaRepository(db)
+    offers = await repo.get_active_without_categoria()
+    updates = [(o.id, classify(o.producto_nombre)) for o in offers]
+    return await repo.bulk_update_categorias(updates)
+
+
+async def enrich_nutriscore(db: AsyncSession) -> dict:
+    """Hybrid NutriScore enrichment from Open Food Facts.
+
+    Strategy:
+    1. Offers WITH barcode → lookup by barcode (exact match)
+    2. Offers WITHOUT barcode → search by product name (first result)
+    Both cached in Redis for 7 days.
+    """
+    import asyncio
+    from src.core.config import settings
+    import redis.asyncio as aioredis
+
+    repo = OfertaRepository(db)
+
+    # Get ALL active offers without nutriscore (not just ones with barcode)
+    from sqlalchemy import select, func
+    from src.models.oferta import Oferta
+    result = await db.execute(
+        select(Oferta)
+        .where(Oferta.activo == True, Oferta.nutriscore.is_(None))  # noqa: E712
+        .limit(800)
+    )
+    offers = list(result.scalars().all())
+    if not offers:
+        return {"checked": 0, "enriched_barcode": 0, "enriched_name": 0}
+
+    redis_client = aioredis.from_url(settings.REDIS_URL, decode_responses=True)
+
+    def _clean_search_name(name: str) -> str:
+        """Clean product name for OFF search — remove weights, prices, parentheses."""
+        name = re.sub(r"\([^)]*\)", "", name)
+        name = re.sub(r"\d+[.,]?\d*\s*(kg|g|ml|l|cl|€|eur|€/kg)\b", "", name, flags=re.IGNORECASE)
+        name = re.sub(r"\bEl\s+kg\b", "", name, flags=re.IGNORECASE)
+        name = re.sub(r"\s+", " ", name).strip()
+        words = name.split()[:3]
+        return " ".join(words)
+    _OFF_FIELDS = "nutriscore_grade,nutrition_grades,nova_group"
+    barcode_updates: list[tuple[str, str | None, int | None]] = []
+    name_updates: list[tuple[int, str | None, int | None]] = []  # by offer ID
+    checked = 0
+
+    def _parse_ns(product: dict) -> tuple[str | None, int | None]:
+        ns = product.get("nutriscore_grade") or product.get("nutrition_grades")
+        nova = product.get("nova_group")
+        if ns and ns.lower() in ("a", "b", "c", "d", "e"):
+            nova_int = int(nova) if nova and str(nova).isdigit() else None
+            return ns.lower(), nova_int
+        return None, None
+
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            for offer in offers:
+                cache_key = f"off:{offer.barcode}" if offer.barcode else f"off_name:{_normalize(offer.producto_nombre)[:80]}"
+
+                # Check cache
+                cached = await redis_client.get(cache_key)
+                if cached is not None:
+                    if cached != "none":
+                        parts = cached.split(",")
+                        ns = parts[0] if parts[0] else None
+                        nova = int(parts[1]) if len(parts) > 1 and parts[1] else None
+                        if offer.barcode:
+                            barcode_updates.append((offer.barcode, ns, nova))
+                        elif ns:
+                            name_updates.append((offer.id, ns, nova))
+                    checked += 1
+                    continue
+
+                # Strategy 1: barcode lookup (exact)
+                if offer.barcode:
+                    try:
+                        resp = await client.get(
+                            f"https://world.openfoodfacts.org/api/v2/product/{offer.barcode}.json",
+                            params={"fields": _OFF_FIELDS},
+                        )
+                        if resp.status_code == 200:
+                            product = resp.json().get("product", {})
+                            ns, nova = _parse_ns(product)
+                            if ns:
+                                barcode_updates.append((offer.barcode, ns, nova))
+                                await redis_client.setex(cache_key, 604800, f"{ns},{nova or ''}")
+                            else:
+                                await redis_client.setex(cache_key, 604800, "none")
+                        else:
+                            await redis_client.setex(cache_key, 604800, "none")
+                    except Exception as exc:
+                        logger.warning("OFF barcode lookup failed for %s: %s", offer.barcode, exc)
+
+                # Strategy 2: name search (fuzzy, first result)
+                else:
+                    # Clean product name for search
+                    search_q = _clean_search_name(offer.producto_nombre)
+                    if len(search_q) < 3:
+                        checked += 1
+                        await asyncio.sleep(1.0)
+                        continue
+                    try:
+                        resp = await client.get(
+                            "https://world.openfoodfacts.org/cgi/search.pl",
+                            params={
+                                "search_terms": search_q,
+                                "search_simple": "1",
+                                "action": "process",
+                                "json": "1",
+                                "page_size": "1",
+                                "fields": _OFF_FIELDS,
+                                "tagtype_0": "countries",
+                                "tag_contains_0": "contains",
+                                "tag_0": "spain",
+                            },
+                        )
+                        if resp.status_code == 200:
+                            products = resp.json().get("products", [])
+                            if products:
+                                ns, nova = _parse_ns(products[0])
+                                if ns:
+                                    name_updates.append((offer.id, ns, nova))
+                                    await redis_client.setex(cache_key, 604800, f"{ns},{nova or ''}")
+                                else:
+                                    await redis_client.setex(cache_key, 604800, "none")
+                            else:
+                                await redis_client.setex(cache_key, 604800, "none")
+                        else:
+                            await redis_client.setex(cache_key, 604800, "none")
+                    except Exception as exc:
+                        logger.warning("OFF name search failed for '%s': %s", search_q, exc)
+
+                checked += 1
+                # Rate limit: 1 req/sec to respect OFF terms of use
+                await asyncio.sleep(1.0)
+    finally:
+        await redis_client.aclose()
+
+    # Apply barcode-based updates (updates all offers sharing that barcode)
+    enriched_barcode = await repo.bulk_update_nutriscore(barcode_updates)
+
+    # Apply name-based updates (by individual offer ID)
+    enriched_name = 0
+    for offer_id, ns, nova in name_updates:
+        from sqlalchemy import update as sa_update
+        vals: dict = {}
+        if ns:
+            vals["nutriscore"] = ns
+        if nova is not None:
+            vals["novascore"] = nova
+        if vals:
+            r = await db.execute(
+                sa_update(Oferta).where(Oferta.id == offer_id).values(**vals)
+            )
+            enriched_name += r.rowcount
+    await db.flush()
+
+    logger.info(
+        "NutriScore enrichment: checked=%d, enriched_barcode=%d, enriched_name=%d",
+        checked, enriched_barcode, enriched_name,
+    )
+    return {
+        "checked": checked,
+        "enriched_barcode": enriched_barcode,
+        "enriched_name": enriched_name,
+    }
+
+
+async def run_nutriscore_enrichment_background():
+    """Standalone coroutine for background nutriscore enrichment."""
+    from src.db.session import AsyncSessionLocal
+    async with AsyncSessionLocal() as db:
+        try:
+            result = await enrich_nutriscore(db)
+            await db.commit()
+            logger.info("Background NutriScore enrichment: %s", result)
+        except Exception as exc:
+            logger.error("Background NutriScore enrichment failed: %s", exc)
+
+
+async def enrich_images_from_off(db: AsyncSession, limit: int = 200) -> int:
+    """Find images from Open Food Facts for active offers that have no image.
+
+    Uses OFF text search to find a matching product photo.
+    Caches results in Redis to avoid repeated lookups.
+    """
+    import asyncio
+    import redis.asyncio as aioredis
+    from src.core.config import settings
+    from sqlalchemy import select, update as sa_update
+    from src.models.oferta import Oferta
+
+    result = await db.execute(
+        select(Oferta)
+        .where(Oferta.activo == True, Oferta.imagen_url.is_(None))  # noqa: E712
+        .limit(limit)
+    )
+    offers = list(result.scalars().all())
+    if not offers:
+        return 0
+
+    redis_client = aioredis.from_url(settings.REDIS_URL, decode_responses=True)
+    enriched = 0
+
+    try:
+        for offer in offers:
+            # Clean name for search
+            search_q = re.sub(r"\([^)]*\)", "", offer.producto_nombre)
+            search_q = re.sub(r"\d+[.,]?\d*\s*(kg|g|ml|l|cl|€)\b", "", search_q, flags=re.IGNORECASE)
+            search_q = " ".join(search_q.split()[:3]).strip()
+            if len(search_q) < 3:
+                continue
+
+            cache_key = f"off_img:{search_q[:60]}"
+            cached = await redis_client.get(cache_key)
+            if cached is not None:
+                if cached != "none":
+                    await db.execute(
+                        sa_update(Oferta).where(Oferta.id == offer.id).values(imagen_url=cached)
+                    )
+                    enriched += 1
+                continue
+
+            try:
+                async with httpx.AsyncClient(timeout=12) as client:
+                    resp = await client.get(
+                        "https://world.openfoodfacts.org/cgi/search.pl",
+                        params={
+                            "search_terms": search_q,
+                            "search_simple": "1",
+                            "action": "process",
+                            "json": "1",
+                            "page_size": "1",
+                            "fields": "image_front_small_url,image_front_url",
+                            "tagtype_0": "countries",
+                            "tag_contains_0": "contains",
+                            "tag_0": "spain",
+                        },
+                    )
+                    if resp.status_code == 200:
+                        products = resp.json().get("products", [])
+                        if products:
+                            img = products[0].get("image_front_small_url") or products[0].get("image_front_url")
+                            if img:
+                                await db.execute(
+                                    sa_update(Oferta).where(Oferta.id == offer.id).values(imagen_url=img)
+                                )
+                                await redis_client.setex(cache_key, 604800, img)
+                                enriched += 1
+                            else:
+                                await redis_client.setex(cache_key, 604800, "none")
+                        else:
+                            await redis_client.setex(cache_key, 604800, "none")
+            except Exception:
+                pass
+
+            await asyncio.sleep(1.2)
+    finally:
+        await redis_client.aclose()
+
+    await db.flush()
+    logger.info("Image enrichment from OFF: %d/%d offers got images", enriched, len(offers))
+    return enriched
+
+
+async def run_image_enrichment_background():
+    """Standalone coroutine for background image enrichment."""
+    from src.db.session import AsyncSessionLocal
+    async with AsyncSessionLocal() as db:
+        try:
+            count = await enrich_images_from_off(db)
+            await db.commit()
+            logger.info("Background image enrichment: %d offers enriched", count)
+        except Exception as exc:
+            logger.error("Background image enrichment failed: %s", exc)
+
+
+async def run_classify_background():
+    """Standalone coroutine for background category classification."""
+    from src.db.session import AsyncSessionLocal
+    async with AsyncSessionLocal() as db:
+        try:
+            count = await classify_existing_offers(db)
+            await db.commit()
+            logger.info("Background category classification: %d offers classified", count)
+        except Exception as exc:
+            logger.error("Background category classification failed: %s", exc)
 
 
 async def get_oferta(oferta_id: int, db: AsyncSession):

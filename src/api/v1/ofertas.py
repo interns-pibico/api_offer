@@ -30,6 +30,8 @@ async def list_ofertas(
     fuente: str | None = Query(default=None, description="Filter by source domain"),
     barcode: str | None = Query(default=None, description="Filter by EAN barcode"),
     q: str | None = Query(default=None, description="Search by product name"),
+    categoria: str | None = Query(default=None, description="Filter by product category"),
+    nutriscore: str | None = Query(default=None, description="Filter by NutriScore grade (a-e)"),
     activo: bool | None = Query(default=True, description="Filter by active status"),
     sort: str = Query(default="descuento_desc", description="Sort: descuento_desc|precio_asc|precio_desc|fecha_desc"),
     page: int = Query(default=1, ge=1),
@@ -38,7 +40,9 @@ async def list_ofertas(
     """List scraped price-drop offers with optional filters. Public endpoint."""
     offset = (page - 1) * page_size
     items, total = await oferta_service.list_ofertas(
-        db, fuente=fuente, activo=activo, barcode=barcode, q=q, sort=sort, offset=offset, limit=page_size
+        db, fuente=fuente, activo=activo, barcode=barcode, q=q,
+        categoria=categoria, nutriscore=nutriscore,
+        sort=sort, offset=offset, limit=page_size,
     )
     pages = math.ceil(total / page_size) if total > 0 else 1
     return PaginatedResponse(
@@ -54,6 +58,16 @@ async def list_ofertas(
 async def list_fuentes(db: DbSession) -> list[str]:
     """Return all distinct fuente values present in the offers table."""
     return await oferta_service.list_fuentes(db)
+
+
+@router.get(
+    "/categorias",
+    response_model=list[str],
+    summary="List all distinct product categories",
+)
+async def list_categorias(db: DbSession) -> list[str]:
+    """Return distinct categories from active offers."""
+    return await oferta_service.list_categorias(db)
 
 
 @router.get(
@@ -90,7 +104,11 @@ async def compare_offers(
 )
 async def get_stats(db: DbSession) -> dict:
     """Return aggregate statistics about active offers."""
-    return await oferta_service.get_stats(db)
+    from src.db.repositories.oferta_repository import OfertaRepository
+    stats = await oferta_service.get_stats(db)
+    repo = OfertaRepository(db)
+    stats["nutriscore_distribution"] = await repo.get_nutriscore_stats()
+    return stats
 
 
 @router.get(
@@ -212,6 +230,46 @@ async def scrape_offers(
         deactivated_previous=deactivated,
         source=source_domain,
     )
+
+
+@router.post(
+    "/enrich-nutriscore",
+    summary="Trigger NutriScore enrichment from Open Food Facts (admin)",
+)
+async def trigger_nutriscore_enrich(
+    background_tasks: BackgroundTasks,
+    _admin: AdminAuth,
+) -> dict:
+    """Enrich offers with NutriScore data from Open Food Facts."""
+    background_tasks.add_task(oferta_service.run_nutriscore_enrichment_background)
+    return {"status": "nutriscore enrichment queued"}
+
+
+@router.post(
+    "/enrich-images",
+    summary="Trigger image enrichment from Open Food Facts (admin)",
+)
+async def trigger_image_enrich(
+    background_tasks: BackgroundTasks,
+    _admin: AdminAuth,
+) -> dict:
+    """Find images from OFF for offers that have no image."""
+    background_tasks.add_task(oferta_service.run_image_enrichment_background)
+    return {"status": "image enrichment queued"}
+
+
+@router.post(
+    "/classify-categories",
+    summary="Classify existing offers into categories (admin)",
+)
+async def trigger_classify(
+    db: DbSession,
+    _admin: AdminAuth,
+) -> dict:
+    """Apply keyword-based category classification to all uncategorized active offers."""
+    count = await oferta_service.classify_existing_offers(db)
+    await db.commit()
+    return {"classified": count}
 
 
 @router.delete(

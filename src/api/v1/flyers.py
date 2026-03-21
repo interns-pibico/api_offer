@@ -6,7 +6,7 @@ import json
 import logging
 
 import fitz
-from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
+from fastapi import APIRouter, BackgroundTasks, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import StreamingResponse
 
 from src.core.dependencies import AdminAuth, DbSession
@@ -17,6 +17,17 @@ from src.services import flyer_service, oferta_service
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/flyers", tags=["flyers"])
+
+# Mapping: supermarket key → web scraper fuente domain
+_WEB_FUENTE = {
+    "carrefour": "www.carrefour.es",
+    "alimerka": "alimerkaonline.es",
+    "masymas": "supermasymasonline.com",
+    "aldi": "aldi.es",
+    "alcampo": "www.compraonline.alcampo.es",
+    "familia": "www.familiaonline.es",
+    "gadis": "www.gadisline.com",
+}
 
 
 @router.get(
@@ -71,6 +82,7 @@ async def extract_flyer(
     request: Request,
     db: DbSession,
     _admin: AdminAuth,
+    background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     supermarket: str = Form(...),
     pages: str = Form("", description="Pages to extract: '1,3,5-10' or empty for all"),
@@ -188,55 +200,98 @@ async def extract_flyer(
                 "total_products_so_far": len(all_products),
             })
 
-        # Check for duplicates before saving
+        # Save using the same upsert pattern as web scrapers:
+        # deactivate old → upsert → snapshot
         saved = 0
-        new_products = []
-        duplicate_products = []
+        updated = 0
+        deactivated = 0
 
-        from src.db.repositories.oferta_repository import OfertaRepository
+        if save and all_products:
+            from src.db.repositories.oferta_repository import OfertaRepository
 
-        if all_products:
             repo = OfertaRepository(db)
+
+            # Deactivate all previous offers for this folleto source
+            deactivated = await repo.deactivate_by_fuente(fuente)
+            logger.info("Flyer %s: deactivated %d previous offers", fuente, deactivated)
+
             for p in all_products:
                 if not p.producto_nombre:
                     continue
+                # Check if the product already exists (from a previous extraction)
                 existing = await repo.get_by_name_and_fuente(p.producto_nombre, fuente)
                 if existing:
-                    duplicate_products.append(p)
+                    existing.precio_oferta = p.precio_oferta
+                    existing.precio_original = p.precio_original
+                    existing.descuento_porcentaje = p.descuento_porcentaje
+                    existing.activo = True
+                    from datetime import datetime, timezone
+                    existing.scraped_at = datetime.now(timezone.utc)
+                    await db.flush()
+                    updated += 1
                 else:
-                    new_products.append(p)
+                    await repo.create(OfertaCreate(
+                        producto_nombre=p.producto_nombre,
+                        precio_oferta=p.precio_oferta,
+                        precio_original=p.precio_original,
+                        descuento_porcentaje=p.descuento_porcentaje,
+                        fuente=fuente,
+                        producto_url=None,
+                        imagen_url=None,
+                    ))
+                    saved += 1
 
-        if save and new_products:
-            repo = repo if all_products else OfertaRepository(db)
-            for p in new_products:
-                await repo.create(OfertaCreate(
-                    producto_nombre=p.producto_nombre,
-                    precio_oferta=p.precio_oferta,
-                    precio_original=p.precio_original,
-                    descuento_porcentaje=p.descuento_porcentaje,
-                    fuente=fuente,
-                    producto_url=None,
-                    imagen_url=None,
-                ))
-                saved += 1
             await db.commit()
-            logger.info("Flyer %s: saved=%d new products", fuente, saved)
+            logger.info(
+                "Flyer %s: saved=%d new, updated=%d existing, deactivated=%d previous",
+                fuente, saved, updated, deactivated,
+            )
+
+            # Enrich images from web scraper offers of the same supermarket
+            web_fuente = _WEB_FUENTE.get(supermarket)
+            if web_fuente:
+                try:
+                    enriched = await repo.enrich_images_from_web(fuente, web_fuente)
+                    if enriched:
+                        await db.commit()
+                        logger.info("Flyer %s: enriched %d offers with images from %s", fuente, enriched, web_fuente)
+                except Exception as exc:
+                    logger.warning("Image enrichment failed for %s: %s", fuente, exc)
+
+            # Fallback: enrich remaining imageless offers from OFF
+            from src.services.oferta_service import run_image_enrichment_background
+            background_tasks.add_task(run_image_enrichment_background)
+
+            # Create snapshot for evolution charts
+            try:
+                from src.db.repositories.snapshot_repository import SnapshotRepository
+                snap_repo = SnapshotRepository(db)
+                await snap_repo.create_from_live_data(fuente)
+                await db.commit()
+                logger.info("Snapshot created for %s", fuente)
+            except Exception as exc:
+                logger.warning("Snapshot creation failed for %s: %s", fuente, exc)
+
             asyncio.create_task(oferta_service.run_enrich_background())
 
         all_pages.sort(key=lambda p: p["page"])
 
         # Send "done" event
+        total_cost = flyer_service._calc_cost(total_in, total_out)
         yield _sse({
             "type": "done",
             "total_pages": total_pages_pdf,
             "pages_processed": len(all_pages),
             "total_products_found": len(all_products),
             "saved": saved,
-            "duplicates": len(duplicate_products),
-            "duplicate_names": [p.producto_nombre for p in duplicate_products],
+            "updated": updated,
+            "deactivated": deactivated,
             "source": fuente,
             "pages": all_pages,
             "errors": errors,
+            "cost_usd": total_cost,
+            "tokens_input": total_in,
+            "tokens_output": total_out,
         })
 
     return StreamingResponse(event_stream(), media_type="text/event-stream")
